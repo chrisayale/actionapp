@@ -135,3 +135,6 @@ actionapp/
 4. **Deploy Firebase Rules**:
    - `cd firebase && firebase deploy --only firestore:rules,storage:rules`
 
+
+
+

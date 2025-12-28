@@ -198,3 +198,6 @@ await FirebaseService.usersCollection.doc('userId').set({
 - Vérifiez que le fichier est dans `ios/Runner/`
 - Vérifiez qu'il est ajouté au projet dans Xcode
 
+
+
+

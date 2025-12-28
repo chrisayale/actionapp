@@ -37,11 +37,27 @@ const verifyToken = async (req, res) => {
 /**
  * Create or update user profile after OTP verification
  * POST /api/auth/create-profile
- * Body: { token: string, phoneNumber: string, displayName?: string }
+ * Body: { 
+ *   token: string, 
+ *   phoneNumber?: string,
+ *   displayName?: string,
+ *   gender?: 'M' | 'F',
+ *   dateOfBirth?: string (ISO 8601),
+ *   photoUrl?: string,
+ *   pin?: string (4 digits),
+ * }
  */
 const createProfile = async (req, res) => {
   try {
-    const { token, phoneNumber, displayName } = req.body;
+    const { 
+      token, 
+      phoneNumber, 
+      displayName, 
+      gender, 
+      dateOfBirth, 
+      photoUrl,
+      pin 
+    } = req.body;
     
     if (!token) {
       return res.status(401).json({ 
@@ -57,9 +73,68 @@ const createProfile = async (req, res) => {
     // Check if user already exists in Firestore
     const userDoc = await admin.firestore().collection('users').doc(uid).get();
     
+    // Validate PIN if provided (must be 4 digits)
+    if (pin !== undefined && pin !== null && pin !== '') {
+      if (!/^\d{4}$/.test(pin)) {
+        return res.status(400).json({
+          success: false,
+          error: 'PIN must be exactly 4 digits'
+        });
+      }
+    }
+    
+    // Validate gender if provided
+    if (gender !== undefined && gender !== null && gender !== '') {
+      if (!['M', 'F'].includes(gender)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Gender must be "M" or "F"'
+        });
+      }
+    }
+    
+    // Validate date of birth if provided
+    let validatedDateOfBirth = null;
+    if (dateOfBirth !== undefined && dateOfBirth !== null && dateOfBirth !== '') {
+      const date = new Date(dateOfBirth);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid date of birth format. Use ISO 8601 format (YYYY-MM-DD)'
+        });
+      }
+      // Ensure user is at least 13 years old
+      const minDate = new Date();
+      minDate.setFullYear(minDate.getFullYear() - 13);
+      if (date > minDate) {
+        return res.status(400).json({
+          success: false,
+          error: 'User must be at least 13 years old'
+        });
+      }
+      validatedDateOfBirth = date.toISOString();
+    }
+    
+    // Hash PIN if provided (simple hash for now, consider bcrypt for production)
+    let hashedPin = null;
+    if (pin !== undefined && pin !== null && pin !== '') {
+      // For now, we'll store a simple hash. In production, use bcrypt
+      const crypto = require('crypto');
+      hashedPin = crypto.createHash('sha256').update(pin).digest('hex');
+    }
+    
+    // Determine if profile is complete
+    // Profile is complete if: PIN, gender, and dateOfBirth are all provided
+    const profileComplete = !!(pin && gender && validatedDateOfBirth);
+    
     const userData = {
-      phoneNumber: phoneNumber || decodedToken.phone_number,
+      phoneNumber: phoneNumber || decodedToken.phone_number || null,
       displayName: displayName || null,
+      gender: gender || null,
+      dateOfBirth: validatedDateOfBirth,
+      photoUrl: photoUrl || null,
+      pin: hashedPin, // Store hashed PIN (null if not provided)
+      profileComplete,
       email: decodedToken.email || null,
       createdAt: userDoc.exists 
         ? userDoc.data().createdAt 
@@ -68,17 +143,43 @@ const createProfile = async (req, res) => {
       lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     
+    // Remove null values for cleaner data
+    Object.keys(userData).forEach(key => {
+      if (userData[key] === null) {
+        delete userData[key];
+      }
+    });
+    
     // Create or update user profile
     await admin.firestore().collection('users').doc(uid).set(userData, { merge: true });
     
+    // Update Firebase Auth displayName and photoURL if provided
+    const authUpdateData = {};
+    if (displayName) {
+      authUpdateData.displayName = displayName;
+    }
+    if (photoUrl) {
+      authUpdateData.photoURL = photoUrl;
+    }
+    
+    if (Object.keys(authUpdateData).length > 0) {
+      await admin.auth().updateUser(uid, authUpdateData);
+    }
+    
     // Get the created/updated user data
     const updatedUserDoc = await admin.firestore().collection('users').doc(uid).get();
+    const userDataResponse = updatedUserDoc.data();
+    
+    // Don't return PIN in response
+    if (userDataResponse.pin) {
+      delete userDataResponse.pin;
+    }
     
     res.json({ 
       success: true,
       user: {
         id: uid,
-        ...updatedUserDoc.data()
+        ...userDataResponse
       }
     });
   } catch (error) {
@@ -140,7 +241,13 @@ const getProfile = async (req, res) => {
  * Update user profile
  * PUT /api/auth/profile
  * Headers: Authorization: Bearer <token>
- * Body: { displayName?: string, ... }
+ * Body: { 
+ *   displayName?: string,
+ *   gender?: 'M' | 'F',
+ *   dateOfBirth?: string (ISO 8601),
+ *   photoUrl?: string,
+ *   pin?: string (4 digits),
+ * }
  */
 const updateProfile = async (req, res) => {
   try {
@@ -156,10 +263,100 @@ const updateProfile = async (req, res) => {
     const decodedToken = await admin.auth().verifyIdToken(token);
     const uid = decodedToken.uid;
     
+    const { 
+      displayName, 
+      gender, 
+      dateOfBirth, 
+      photoUrl,
+      pin 
+    } = req.body;
+    
+    // Get existing user data
+    const userDoc = await admin.firestore().collection('users').doc(uid).get();
+    const existingData = userDoc.exists ? userDoc.data() : {};
+    
     const updateData = {
-      ...req.body,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
+    
+    // Update displayName if provided
+    if (displayName !== undefined) {
+      updateData.displayName = displayName || null;
+    }
+    
+    // Update gender if provided
+    if (gender !== undefined) {
+      if (gender && !['M', 'F'].includes(gender)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Gender must be "M" or "F"'
+        });
+      }
+      updateData.gender = gender || null;
+    }
+    
+    // Update date of birth if provided
+    if (dateOfBirth !== undefined) {
+      if (dateOfBirth && dateOfBirth !== '') {
+        const date = new Date(dateOfBirth);
+        if (isNaN(date.getTime())) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid date of birth format. Use ISO 8601 format (YYYY-MM-DD)'
+          });
+        }
+        // Ensure user is at least 13 years old
+        const minDate = new Date();
+        minDate.setFullYear(minDate.getFullYear() - 13);
+        if (date > minDate) {
+          return res.status(400).json({
+            success: false,
+            error: 'User must be at least 13 years old'
+          });
+        }
+        updateData.dateOfBirth = date.toISOString();
+      } else {
+        updateData.dateOfBirth = null;
+      }
+    }
+    
+    // Update photo URL if provided
+    if (photoUrl !== undefined) {
+      updateData.photoUrl = photoUrl || null;
+    }
+    
+    // Update PIN if provided
+    if (pin !== undefined) {
+      if (pin && pin !== '') {
+        if (!/^\d{4}$/.test(pin)) {
+          return res.status(400).json({
+            success: false,
+            error: 'PIN must be exactly 4 digits'
+          });
+        }
+        // Hash PIN
+        const crypto = require('crypto');
+        updateData.pin = crypto.createHash('sha256').update(pin).digest('hex');
+      } else {
+        updateData.pin = null;
+      }
+    }
+    
+    // Determine if profile is complete
+    const finalData = { ...existingData, ...updateData };
+    const profileComplete = !!(
+      finalData.pin && 
+      finalData.gender && 
+      finalData.dateOfBirth
+    );
+    updateData.profileComplete = profileComplete;
+    
+    // Remove null values
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === null && key !== 'displayName' && key !== 'gender' && key !== 'dateOfBirth' && key !== 'photoUrl') {
+        delete updateData[key];
+      }
+    });
     
     // Remove fields that shouldn't be updated directly
     delete updateData.id;
@@ -167,13 +364,33 @@ const updateProfile = async (req, res) => {
     
     await admin.firestore().collection('users').doc(uid).update(updateData);
     
+    // Update Firebase Auth displayName and photoURL if provided
+    const authUpdateData = {};
+    if (displayName !== undefined) {
+      authUpdateData.displayName = displayName || null;
+    }
+    if (photoUrl !== undefined) {
+      authUpdateData.photoURL = photoUrl || null;
+    }
+    
+    if (Object.keys(authUpdateData).length > 0) {
+      await admin.auth().updateUser(uid, authUpdateData);
+    }
+    
+    // Get the updated user data
     const updatedUserDoc = await admin.firestore().collection('users').doc(uid).get();
+    const userDataResponse = updatedUserDoc.data();
+    
+    // Don't return PIN in response
+    if (userDataResponse.pin) {
+      delete userDataResponse.pin;
+    }
     
     res.json({ 
       success: true,
       user: {
         id: uid,
-        ...updatedUserDoc.data()
+        ...userDataResponse
       }
     });
   } catch (error) {

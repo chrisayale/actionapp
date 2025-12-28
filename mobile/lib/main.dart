@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'core/firebase/firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routes/app_routes.dart';
@@ -45,11 +46,19 @@ Future<void> _connectToFirebaseEmulators() async {
     // Connecter Firestore Emulator
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
     
+    // Connecter Storage Emulator
+    FirebaseStorage.instance.useStorageEmulator(host, 9199);
+    
     if (kDebugMode) {
       print('✅ Connecté aux emulators Firebase locaux');
       print('   - Host: $host');
       print('   - Auth: $host:9099');
       print('   - Firestore: $host:8080');
+      print('   - Storage: $host:9199');
+      print('');
+      print('⚠️  Note: Les emulators Storage peuvent être très lents en développement.');
+      print('   Les uploads peuvent prendre plusieurs minutes même pour de petits fichiers.');
+      print('   En production, les uploads seront beaucoup plus rapides.');
     }
   } catch (e) {
     if (kDebugMode) {

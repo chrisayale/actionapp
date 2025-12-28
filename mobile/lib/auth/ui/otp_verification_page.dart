@@ -417,6 +417,15 @@ class _OTPVerificationPageState extends State<OTPVerificationPage>
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
+        final size = MediaQuery.of(context).size;
+        final screenPadding = size.width * 0.08 * 2; // Left + right padding
+        final cardPadding = 48.0; // 24 * 2 (left + right)
+        final availableWidth = size.width - screenPadding - cardPadding;
+        final spacing = 6.0; // Reduced spacing
+        final totalSpacing = spacing * (AppConstants.otpLength - 1);
+        final fieldWidth = (availableWidth - totalSpacing) / AppConstants.otpLength;
+        final responsiveFieldSize = fieldWidth.clamp(45.0, 60.0); // Min 45, Max 60
+        
         return Card(
           elevation: 12,
           shadowColor: const Color(0xFF4CAF50).withOpacity(0.2),
@@ -424,7 +433,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage>
             borderRadius: BorderRadius.circular(24),
           ),
           child: Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               color: Colors.white,
@@ -438,10 +447,17 @@ class _OTPVerificationPageState extends State<OTPVerificationPage>
               ],
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(
                 AppConstants.otpLength,
-                (index) => _buildOTPField(index),
+                (index) => Flexible(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: index < AppConstants.otpLength - 1 ? spacing : 0,
+                    ),
+                    child: _buildOTPField(index, responsiveFieldSize),
+                  ),
+                ),
               ),
             ),
           ),
@@ -450,73 +466,79 @@ class _OTPVerificationPageState extends State<OTPVerificationPage>
     );
   }
 
-  Widget _buildOTPField(int index) {
+  Widget _buildOTPField(int index, double fieldSize) {
     final isFocused = _focusNodes[index].hasFocus;
-    final hasValue = _controllers[index].text.isNotEmpty;
 
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
-        return Container(
-          width: 52,
-          height: 64,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: isFocused
-                ? [
-                    BoxShadow(
-                      color: (_colorAnimation.value ?? const Color(0xFF4CAF50))
-                          .withOpacity(0.3 * _glowAnimation.value),
-                      blurRadius: 15,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 4),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final actualWidth = constraints.maxWidth.clamp(45.0, 60.0);
+            final actualHeight = actualWidth * 1.2;
+            return Container(
+              width: actualWidth,
+              height: actualHeight,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: isFocused
+                    ? [
+                        BoxShadow(
+                          color: (_colorAnimation.value ?? const Color(0xFF4CAF50))
+                              .withOpacity(0.3 * _glowAnimation.value),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: TextField(
+                controller: _controllers[index],
+                focusNode: _focusNodes[index],
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                maxLength: 1,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                style: GoogleFonts.inter(
+                  fontSize: actualWidth * 0.55, // Responsive font size
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black,
+                  letterSpacing: 0,
+                  height: 1.2,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: Colors.grey[400]!,
+                      width: 2.5,
                     ),
-                  ]
-                : null,
-          ),
-          child: TextField(
-            controller: _controllers[index],
-            focusNode: _focusNodes[index],
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            maxLength: 1,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-            ],
-            style: GoogleFonts.inter(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-              letterSpacing: 2,
-            ),
-            decoration: InputDecoration(
-              counterText: '',
-              filled: true,
-              fillColor: Colors.grey[50],
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: Colors.grey[300]!,
-                  width: 2,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: Colors.grey[400]!,
+                      width: 2.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: _colorAnimation.value ?? const Color(0xFF4CAF50),
+                      width: 3,
+                    ),
+                  ),
                 ),
+                onChanged: (value) => _onCodeChanged(index, value),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: Colors.grey[300]!,
-                  width: 2,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: _colorAnimation.value ?? const Color(0xFF4CAF50),
-                  width: 3,
-                ),
-              ),
-            ),
-            onChanged: (value) => _onCodeChanged(index, value),
-          ),
+            );
+          },
         );
       },
     );

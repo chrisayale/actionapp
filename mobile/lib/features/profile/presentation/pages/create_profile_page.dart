@@ -1,9 +1,13 @@
-import 'dart:io';
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../../../../auth/auth_controller.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/firebase_service.dart';
@@ -43,7 +47,8 @@ class _CreateProfilePageState extends State<CreateProfilePage>
 
   String? _selectedGender;
   DateTime? _selectedDateOfBirth;
-  File? _selectedImage;
+  XFile? _selectedImage;
+  Uint8List? _selectedImageBytes;
   bool _isLoading = false;
 
   late AnimationController _animationController;
@@ -102,45 +107,219 @@ class _CreateProfilePageState extends State<CreateProfilePage>
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
     
-    // Show dialog to choose source
+    // Show modern bottom sheet to choose source
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Galerie'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4CAF50)
+                      .withOpacity(0.2 * _glowAnimation.value),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                  offset: const Offset(0, -5),
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Caméra'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle bar
+                  Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  // Title
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    child: ShaderMask(
+                      shaderCallback: (bounds) => LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFF4CAF50),
+                          const Color(0xFF2196F3),
+                        ],
+                      ).createShader(bounds),
+                      child: Text(
+                        'Choisir une photo',
+                        style: GoogleFonts.inter(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Options
+                  _buildImageSourceOption(
+                    context: context,
+                    icon: Icons.photo_library,
+                    title: 'Galerie',
+                    subtitle: 'Choisir depuis vos photos',
+                    color: const Color(0xFF4CAF50),
+                    onTap: () => Navigator.pop(context, ImageSource.gallery),
+                  ),
+                  _buildImageSourceOption(
+                    context: context,
+                    icon: Icons.camera_alt,
+                    title: 'Caméra',
+                    subtitle: 'Prendre une nouvelle photo',
+                    color: const Color(0xFF2196F3),
+                    onTap: () => Navigator.pop(context, ImageSource.camera),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
 
     if (source != null) {
       final XFile? image = await picker.pickImage(
         source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
+        maxWidth: 600,
+        maxHeight: 600,
+        imageQuality: 70, // Réduire la qualité pour réduire la taille du fichier
       );
 
       if (image != null && mounted) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
+        // Lire les bytes de l'image (nécessaire pour l'affichage et l'upload)
+        try {
+          final bytes = await image.readAsBytes();
+          setState(() {
+            _selectedImage = image;
+            _selectedImageBytes = bytes;
+          });
+        } catch (e) {
+          if (kDebugMode) {
+            print('Erreur lors de la lecture de l\'image: $e');
+          }
+        }
       }
     }
+  }
+
+  Widget _buildImageSourceOption({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Card(
+          elevation: 4,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                color: Colors.white,
+                border: Border.all(
+                  color: color.withOpacity(0.2),
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          color,
+                          color.withOpacity(0.8),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withOpacity(0.3 * _glowAnimation.value),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      icon,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.inter(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: color,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _selectDateOfBirth() async {
@@ -223,71 +402,132 @@ class _CreateProfilePageState extends State<CreateProfilePage>
 
     try {
       final user = widget.authController.currentUser;
-      if (user == null) return;
-
-      // Upload photo si sélectionnée
-      String? photoUrl;
-      if (_selectedImage != null) {
-        try {
-          final storageRef = FirebaseService.storage
-              .ref()
-              .child('profile_pictures')
-              .child('${user.uid}.jpg');
-          
-          await storageRef.putFile(_selectedImage!);
-          photoUrl = await storageRef.getDownloadURL();
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Erreur lors de l\'upload de la photo: $e'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-        }
+      if (user == null) {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
       }
+
+      // Afficher un dialogue de progression avec style moderne
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          barrierColor: Colors.black.withOpacity(0.6),
+          builder: (context) => PopScope(
+            canPop: false,
+            child: _buildLoadingDialog(),
+          ),
+        );
+      }
+
+      // Upload photo en arrière-plan après sauvegarde du profil
+      // Pour ne pas bloquer la création du profil
+      Uint8List? imageBytesToUpload = _selectedImageBytes;
+      final String userId = user.uid;
 
       final pin = _getPinValue(_pinControllers);
       
+      // Vérifier si le document existe déjà
+      final userDocRef = FirebaseService.firestore.collection('users').doc(user.uid);
+      final userDoc = await userDocRef.get();
+      
       // Sauvegarder le profil dans Firestore (même si incomplet)
-      final profileData = {
+      final profileData = <String, dynamic>{
         'phoneNumber': user.phoneNumber ?? '',
-        'displayName': _nameController.text.trim().isEmpty 
-            ? null 
-            : _nameController.text.trim(),
-        'gender': _selectedGender,
-        'dateOfBirth': _selectedDateOfBirth?.toIso8601String(),
-        'photoUrl': photoUrl,
-        if (pin.isNotEmpty) 'pin': pin, // TODO: Hasher le PIN pour plus de sécurité
-        'profileComplete': pin.isNotEmpty && _selectedGender != null && _selectedDateOfBirth != null,
         'updatedAt': FieldValue.serverTimestamp(),
       };
-
-      await FirebaseService.firestore
-          .collection('users')
-          .doc(user.uid)
-          .set(profileData, SetOptions(merge: true));
+      
+      // Ajouter les champs optionnels seulement s'ils ont une valeur
+      if (_nameController.text.trim().isNotEmpty) {
+        profileData['displayName'] = _nameController.text.trim();
+      }
+      
+      if (_selectedGender != null) {
+        profileData['gender'] = _selectedGender;
+      }
+      
+      if (_selectedDateOfBirth != null) {
+        profileData['dateOfBirth'] = _selectedDateOfBirth!.toIso8601String();
+      }
+      
+      // photoUrl sera ajouté après l'upload en arrière-plan
+      
+      if (pin.isNotEmpty) {
+        profileData['pin'] = pin; // TODO: Hasher le PIN côté backend pour plus de sécurité
+      }
+      
+      profileData['profileComplete'] = pin.isNotEmpty && 
+                                       _selectedGender != null && 
+                                       _selectedDateOfBirth != null;
+      
+      // Ajouter createdAt seulement si le document n'existe pas
+      if (!userDoc.exists) {
+        profileData['createdAt'] = FieldValue.serverTimestamp();
+      }
+      
+      // Sauvegarder dans Firestore
+      if (kDebugMode) {
+        print('💾 Sauvegarde dans Firestore...');
+        print('   UID: ${user.uid}');
+        print('   Document existe: ${userDoc.exists}');
+        print('   Données à sauvegarder: $profileData');
+      }
+      
+      try {
+        await userDocRef.set(profileData, SetOptions(merge: true));
+        
+        if (kDebugMode) {
+          print('✅ Profil sauvegardé dans Firestore avec succès');
+        }
+      } catch (firestoreError) {
+        if (kDebugMode) {
+          print('❌ Erreur Firestore: $firestoreError');
+          print('   Type: ${firestoreError.runtimeType}');
+        }
+        throw firestoreError; // Re-lancer pour être capturé par le catch global
+      }
 
       // Mettre à jour le displayName dans Firebase Auth si fourni
       if (_nameController.text.trim().isNotEmpty) {
         await user.updateDisplayName(_nameController.text.trim());
       }
 
-      // Mettre à jour la photo de profil dans Firebase Auth si uploadée
-      if (photoUrl != null) {
-        await user.updatePhotoURL(photoUrl);
+      // Fermer le dialogue de progression avant la navigation
+      if (mounted) {
+        Navigator.of(context).pop(); // Fermer le dialogue de progression
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
       }
 
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      // Upload photo en arrière-plan (après navigation pour ne pas bloquer)
+      if (imageBytesToUpload != null) {
+        _uploadPhotoInBackground(userId, imageBytesToUpload);
       }
     } catch (e) {
       if (mounted) {
+        // Fermer le dialogue de progression s'il est ouvert
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de la sauvegarde: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Erreur lors de la sauvegarde: $e',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -398,70 +638,160 @@ class _CreateProfilePageState extends State<CreateProfilePage>
   }
 
   Widget _buildPhotoSelector() {
+    final size = MediaQuery.of(context).size;
+    final photoSize = size.width * 0.3; // Responsive size: 30% of screen width
+    final minPhotoSize = 120.0;
+    final maxPhotoSize = 160.0;
+    final finalPhotoSize = photoSize.clamp(minPhotoSize, maxPhotoSize);
+    
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
-        return GestureDetector(
-          onTap: _pickImage,
-          child: Container(
-            width: 140,
-            height: 140,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: _colorAnimation.value ?? const Color(0xFF4CAF50),
-                width: 4,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: (_colorAnimation.value ?? const Color(0xFF4CAF50))
-                      .withOpacity(_glowAnimation.value),
-                  blurRadius: 30,
-                  spreadRadius: 4,
-                  offset: const Offset(0, 0),
+        return Card(
+          elevation: 12,
+          shadowColor: (_colorAnimation.value ?? const Color(0xFF4CAF50))
+              .withOpacity(0.3 * _glowAnimation.value),
+          shape: const CircleBorder(),
+          child: GestureDetector(
+            onTap: _pickImage,
+            child: Container(
+              width: finalPhotoSize,
+              height: finalPhotoSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: _selectedImageBytes != null
+                    ? null
+                    : LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.grey[100]!,
+                          Colors.grey[200]!,
+                        ],
+                      ),
+                border: Border.all(
+                  color: _selectedImageBytes != null
+                      ? (_colorAnimation.value ?? const Color(0xFF4CAF50))
+                      : Colors.transparent,
+                  width: 4,
                 ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 24,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 68,
-                  backgroundColor: Colors.grey[200],
-                  backgroundImage: _selectedImage != null
-                      ? FileImage(_selectedImage!)
-                      : null,
-                  child: _selectedImage == null
-                      ? Icon(
-                          Icons.camera_alt,
-                          size: 50,
-                          color: _colorAnimation.value ?? const Color(0xFF4CAF50),
-                        )
-                      : null,
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _colorAnimation.value ?? const Color(0xFF4CAF50),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                    child: const Icon(
-                      Icons.edit,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (_colorAnimation.value ?? const Color(0xFF4CAF50))
+                        .withOpacity(0.3 * _glowAnimation.value),
+                    blurRadius: 25,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 8),
                   ),
-                ),
-              ],
+                  BoxShadow(
+                    color: const Color(0xFF2196F3)
+                        .withOpacity(0.2 * _glowAnimation.value),
+                    blurRadius: 20,
+                    spreadRadius: 3,
+                    offset: const Offset(0, 6),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: _selectedImageBytes != null
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.memory(
+                            _selectedImageBytes!,
+                            fit: BoxFit.cover,
+                          ),
+                          // Overlay pour l'icône de changement
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      const Color(0xFF4CAF50),
+                                      const Color(0xFF2196F3),
+                                    ],
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  size: 32,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(finalPhotoSize * 0.12),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  const Color(0xFF4CAF50),
+                                  const Color(0xFF45A049),
+                                  const Color(0xFF2196F3),
+                                ],
+                                stops: [
+                                  0.0,
+                                  0.5 + (0.1 * _glowAnimation.value),
+                                  1.0,
+                                ],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF4CAF50)
+                                      .withOpacity(0.4 * _glowAnimation.value),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.add_a_photo,
+                              size: finalPhotoSize * 0.3,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: finalPhotoSize * 0.08),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              'Ajouter une photo',
+                              style: GoogleFonts.inter(
+                                fontSize: finalPhotoSize * 0.09,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[700],
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
           ),
         );
@@ -788,8 +1118,8 @@ class _CreateProfilePageState extends State<CreateProfilePage>
       animation: _animationController,
       builder: (context, child) {
         return Container(
-          width: 52,
-          height: 64,
+          width: 60,
+          height: 72,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             boxShadow: isFocused
@@ -811,31 +1141,33 @@ class _CreateProfilePageState extends State<CreateProfilePage>
             keyboardType: TextInputType.number,
             maxLength: 1,
             obscureText: true,
+            obscuringCharacter: '●',
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
             ],
             style: GoogleFonts.inter(
-              fontSize: 28,
+              fontSize: 36,
               fontWeight: FontWeight.w700,
-              color: Colors.black87,
-              letterSpacing: 2,
+              color: Colors.black,
+              letterSpacing: 0,
+              height: 1.2,
             ),
             decoration: InputDecoration(
               counterText: '',
               filled: true,
-              fillColor: Colors.grey[50],
+              fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: Colors.grey[300]!,
-                  width: 2,
+                  color: Colors.grey[400]!,
+                  width: 2.5,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: Colors.grey[300]!,
-                  width: 2,
+                  color: Colors.grey[400]!,
+                  width: 2.5,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
@@ -1195,6 +1527,292 @@ class _CreateProfilePageState extends State<CreateProfilePage>
         ),
       ],
     );
+  }
+
+  Widget _buildLoadingDialog() {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4CAF50)
+                      .withOpacity(0.3 * _glowAnimation.value),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: const Color(0xFF2196F3)
+                      .withOpacity(0.2 * _glowAnimation.value),
+                  blurRadius: 25,
+                  spreadRadius: 3,
+                  offset: const Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icon animé avec gradient
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF4CAF50),
+                        const Color(0xFF45A049),
+                        const Color(0xFF2196F3),
+                      ],
+                      stops: [
+                        0.0,
+                        0.5 + (0.1 * _glowAnimation.value),
+                        1.0,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4CAF50)
+                            .withOpacity(0.5 * _glowAnimation.value),
+                        blurRadius: 25,
+                        spreadRadius: 5,
+                        offset: const Offset(0, 0),
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFF2196F3)
+                            .withOpacity(0.3 * _glowAnimation.value),
+                        blurRadius: 20,
+                        spreadRadius: 3,
+                        offset: const Offset(0, 0),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.person_add,
+                    color: Colors.white,
+                    size: 50,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                // Indicateur de chargement
+                SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      _colorAnimation.value ?? const Color(0xFF4CAF50),
+                    ),
+                    strokeWidth: 4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Titre avec gradient
+                ShaderMask(
+                  shaderCallback: (bounds) => LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF4CAF50),
+                      const Color(0xFF2196F3),
+                      const Color(0xFFFFD700),
+                    ],
+                    stops: [
+                      0.0,
+                      0.5 + (0.1 * _glowAnimation.value),
+                      1.0,
+                    ],
+                  ).createShader(bounds),
+                  child: Text(
+                    'Création du profil',
+                    style: GoogleFonts.inter(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                      shadows: [
+                        Shadow(
+                          color: const Color(0xFF4CAF50)
+                              .withOpacity(0.5 * _glowAnimation.value),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Sous-titre
+                Text(
+                  'Veuillez patienter...',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Optimise l'image avant l'upload (réduit la taille si nécessaire)
+  Future<Uint8List> _optimizeImage(Uint8List imageBytes) async {
+    // Si l'image fait moins de 300KB, on la garde telle quelle
+    if (imageBytes.length < 300 * 1024) {
+      return imageBytes;
+    }
+    
+    try {
+      if (kDebugMode) {
+        print('🔄 Compression de l\'image (${(imageBytes.length / 1024).toStringAsFixed(0)}KB -> ...)');
+      }
+      
+      // Compresser l'image à 60% de qualité pour réduire significativement la taille
+      final compressedBytes = await FlutterImageCompress.compressWithList(
+        imageBytes,
+        quality: 60,
+        format: CompressFormat.jpeg,
+      );
+      
+      if (kDebugMode) {
+        print('✅ Image compressée: ${(imageBytes.length / 1024).toStringAsFixed(0)}KB -> ${(compressedBytes.length / 1024).toStringAsFixed(0)}KB');
+      }
+      
+      return Uint8List.fromList(compressedBytes);
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Erreur lors de la compression, utilisation de l\'image originale: $e');
+      }
+      return imageBytes;
+    }
+  }
+
+  /// Upload la photo en arrière-plan après la création du profil
+  Future<void> _uploadPhotoInBackground(String userId, Uint8List imageBytes) async {
+    try {
+      if (kDebugMode) {
+        print('📤 Début upload photo en arrière-plan...');
+        print('   UID: $userId');
+        print('   Taille image originale: ${(imageBytes.length / 1024).toStringAsFixed(0)}KB');
+      }
+      
+      // Optimiser l'image avant l'upload
+      final optimizedBytes = await _optimizeImage(imageBytes);
+      
+      if (kDebugMode) {
+        print('   Taille image optimisée: ${(optimizedBytes.length / 1024).toStringAsFixed(0)}KB');
+      }
+      
+      final storageRef = FirebaseService.storage
+          .ref()
+          .child('profile_pictures')
+          .child('$userId.jpg');
+      
+      // Les emulators Firebase Storage peuvent être très lents, même pour de petites images
+      // Utiliser un timeout généreux de 2 minutes pour tous les cas
+      const timeoutDuration = Duration(minutes: 2);
+      
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=31536000',
+      );
+      
+      if (kDebugMode) {
+        print('   Upload en cours (timeout: ${timeoutDuration.inMinutes}min)...');
+        print('   Chemin Storage: profile_pictures/$userId.jpg');
+      }
+      
+      try {
+        // Essayer l'upload avec un timeout
+        final uploadResult = await storageRef.putData(optimizedBytes, metadata).timeout(
+          timeoutDuration,
+          onTimeout: () {
+            if (kDebugMode) {
+              print('   ⚠️ Timeout: L\'upload a pris plus de ${timeoutDuration.inMinutes}min');
+              print('   💡 Note: Les emulators Firebase Storage peuvent être très lents');
+              print('   💡 Le profil est déjà créé, l\'upload peut être ignoré en développement');
+            }
+            throw TimeoutException('Upload de la photo a pris trop de temps (>${timeoutDuration.inMinutes}min). '
+                'C\'est normal avec les emulators Storage en développement.');
+          },
+        );
+        
+        // Attendre que l'upload soit complètement terminé
+        await uploadResult;
+        
+        if (kDebugMode) {
+          print('   ✅ Upload terminé avec succès');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('   ❌ Erreur lors de l\'upload: $e');
+          print('   📝 Type d\'erreur: ${e.runtimeType}');
+          if (e is TimeoutException) {
+            print('   💡 En développement, cette erreur est normale avec les emulators Storage');
+            print('   💡 Le profil est déjà créé et fonctionnel sans la photo');
+          }
+        }
+        rethrow;
+      }
+      
+      if (kDebugMode) {
+        print('   Récupération de l\'URL...');
+      }
+      
+      final photoUrl = await storageRef.getDownloadURL().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Récupération de l\'URL a pris trop de temps');
+        },
+      );
+      
+      if (kDebugMode) {
+        print('✅ Photo uploadée avec succès: $photoUrl');
+      }
+      
+      // Mettre à jour le profil dans Firestore avec photoUrl
+      await FirebaseService.firestore
+          .collection('users')
+          .doc(userId)
+          .update({'photoUrl': photoUrl});
+      
+      // Mettre à jour la photo dans Firebase Auth
+      final user = widget.authController.currentUser;
+      if (user != null) {
+        await user.updatePhotoURL(photoUrl);
+      }
+      
+      if (kDebugMode) {
+        print('✅ Profil mis à jour avec photoUrl');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur upload photo en arrière-plan: $e');
+      }
+      // L'erreur est silencieuse car le profil a déjà été créé
+    }
   }
 }
 

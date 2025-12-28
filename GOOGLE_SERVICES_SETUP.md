@@ -54,3 +54,6 @@ Si vous voyez des erreurs liées à Firebase, vérifiez que :
 - Le package name dans `google-services.json` correspond à `com.kivugreen.actionapp`
 - Les fichiers Gradle sont correctement configurés
 
+
+
+
