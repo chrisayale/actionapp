@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../auth_controller.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/services/firebase_service.dart';
 
 /// OTP verification screen with vibrant colors and animations
 class OTPVerificationPage extends StatefulWidget {
@@ -146,12 +147,39 @@ class _OTPVerificationPageState extends State<OTPVerificationPage>
     if (!mounted) return;
 
     if (success) {
-      // Navigate to home
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.home,
-        (route) => false,
-      );
+      // Vérifier si le profil existe dans Firestore
+      final user = widget.authController.currentUser;
+      if (user != null) {
+        try {
+          final userDoc = await FirebaseService.firestore
+              .collection('users')
+              .doc(user.uid)
+              .get();
+          
+          if (userDoc.exists && userDoc.data()?['profileComplete'] == true) {
+            // Profil complet, naviguer vers home
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.home,
+              (route) => false,
+            );
+          } else {
+            // Profil incomplet ou inexistant, naviguer vers create-profile
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.createProfile,
+              (route) => false,
+            );
+          }
+        } catch (e) {
+          // En cas d'erreur, naviguer vers create-profile par défaut
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.createProfile,
+            (route) => false,
+          );
+        }
+      }
     } else {
       // Show error and clear fields
       final error = widget.authController.errorMessage;

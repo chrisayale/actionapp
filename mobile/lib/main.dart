@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, defaultTargetPlatform;
 import 'package:flutter/services.dart' show TargetPlatform;
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,6 +11,7 @@ import 'core/routes/app_routes.dart';
 import 'auth/auth_controller.dart';
 import 'auth/ui/welcome_page.dart';
 import 'features/profile/presentation/pages/profile_page.dart';
+import 'features/profile/presentation/pages/create_profile_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,18 +71,54 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fr', 'FR'),
+        Locale('en', 'US'),
+      ],
+      locale: const Locale('fr', 'FR'),
       home: const AuthWrapper(),
       routes: {
-        AppRoutes.home: (context) => const ProfilePage(),
-        AppRoutes.profile: (context) => const ProfilePage(),
+        AppRoutes.createProfile: (context) {
+          final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
+          final authController = authWrapperState?.authController ?? AuthController();
+          return CreateProfilePage(authController: authController);
+        },
+        AppRoutes.home: (context) {
+          // Try to get authController from AuthWrapper, otherwise create new one
+          final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
+          final authController = authWrapperState?.authController ?? AuthController();
+          return ProfilePage(authController: authController);
+        },
+        AppRoutes.profile: (context) {
+          final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
+          final authController = authWrapperState?.authController ?? AuthController();
+          return ProfilePage(authController: authController);
+        },
       },
       onGenerateRoute: (settings) {
         // Handle routes that need parameters
         switch (settings.name) {
+          case AppRoutes.createProfile:
+            return MaterialPageRoute(
+              builder: (context) {
+                final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
+                final authController = authWrapperState?.authController ?? AuthController();
+                return CreateProfilePage(authController: authController);
+              },
+            );
           case AppRoutes.home:
           case AppRoutes.profile:
             return MaterialPageRoute(
-              builder: (context) => const ProfilePage(),
+              builder: (context) {
+                final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
+                final authController = authWrapperState?.authController ?? AuthController();
+                return ProfilePage(authController: authController);
+              },
             );
           default:
             return null;
@@ -100,6 +138,9 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   final AuthController _authController = AuthController();
+  
+  // Expose authController for access from routes
+  AuthController get authController => _authController;
 
   @override
   void initState() {
@@ -117,7 +158,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     // Check if user is authenticated
     if (_authController.currentUser != null) {
       // User is logged in, show home
-      return const ProfilePage(); // Replace with your home page
+      return ProfilePage(authController: _authController);
     } else {
       // User is not logged in, show welcome
       return WelcomePage(authController: _authController);
