@@ -23,6 +23,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   String _selectedCategory = 'Boissons';
+  bool _isGridView = false; // false = liste, true = grille
   final List<String> _categories = [
     'Boissons',
     'Karaoké',
@@ -322,12 +323,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   color: AppColors.white.withOpacity(0),
                   child: InkWell(
                     onTap: () {
-                      // TODO: Changer la vue
+                      setState(() {
+                        _isGridView = !_isGridView;
+                      });
                     },
                     borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
                     child: Container(
                       padding: const EdgeInsets.all(AppSpacing.sm),
-                      child: const Icon(Icons.grid_view, color: AppColors.textPrimaryLight, size: 24),
+                      child: Icon(
+                        _isGridView ? Icons.view_list : Icons.grid_view,
+                        color: AppColors.textPrimaryLight,
+                        size: 24,
+                      ),
                     ),
                   ),
                 ),
@@ -912,45 +919,98 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildEstablishmentsList() {
+    // Données des établissements
+    final establishments = [
+      {
+        'name': 'RDC BAR',
+        'location': 'KAVA/GOMBE, Kinshasa',
+        'offer': 'Beaufort',
+        'promotion': '2+1=3',
+        'price': '3 000 CDF',
+        'isActive': true,
+        'distance': '0.5 km',
+        'rating': 4.5,
+      },
+      {
+        'name': 'Bistro Le Soleil d\'Or',
+        'location': 'GOMBE, Kinshasa',
+        'offer': 'Menu du jour',
+        'promotion': '1+1=2',
+        'price': '5 000 CDF',
+        'isActive': true,
+        'distance': '1.2 km',
+        'rating': 4.8,
+      },
+      {
+        'name': 'Café Central',
+        'location': 'LINGWALA, Kinshasa',
+        'offer': 'Café expresso',
+        'promotion': 'Réduction 20%',
+        'price': '2 500 CDF',
+        'isActive': false,
+        'distance': '2.1 km',
+        'rating': 4.2,
+      },
+    ];
+
+    if (_isGridView) {
+      return _buildEstablishmentsGrid(establishments);
+    } else {
+      return _buildEstablishmentsListView(establishments);
+    }
+  }
+
+  Widget _buildEstablishmentsListView(List<Map<String, dynamic>> establishments) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Liste des établissements avec design amélioré
-          _buildEstablishmentCard(
-            name: 'RDC BAR',
-            location: 'KAVA/GOMBE, Kinshasa',
-            offer: 'Beaufort',
-            promotion: '2+1=3',
-            price: '3 000 CDF',
-            isActive: true,
-            distance: '0.5 km',
-            rating: 4.5,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _buildEstablishmentCard(
-            name: 'Bistro Le Soleil d\'Or',
-            location: 'GOMBE, Kinshasa',
-            offer: 'Menu du jour',
-            promotion: '1+1=2',
-            price: '5 000 CDF',
-            isActive: true,
-            distance: '1.2 km',
-            rating: 4.8,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _buildEstablishmentCard(
-            name: 'Café Central',
-            location: 'LINGWALA, Kinshasa',
-            offer: 'Café expresso',
-            promotion: 'Réduction 20%',
-            price: '2 500 CDF',
-            isActive: false,
-            distance: '2.1 km',
-            rating: 4.2,
-          ),
+          for (var establishment in establishments) ...[
+            _buildEstablishmentCard(
+              name: establishment['name'] as String,
+              location: establishment['location'] as String,
+              offer: establishment['offer'] as String,
+              promotion: establishment['promotion'] as String,
+              price: establishment['price'] as String,
+              isActive: establishment['isActive'] as bool,
+              distance: establishment['distance'] as String,
+              rating: establishment['rating'] as double,
+            ),
+            if (establishment != establishments.last) const SizedBox(height: AppSpacing.md),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildEstablishmentsGrid(List<Map<String, dynamic>> establishments) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: AppSpacing.md,
+          mainAxisSpacing: AppSpacing.md,
+          childAspectRatio: 0.75,
+        ),
+        itemCount: establishments.length,
+        itemBuilder: (context, index) {
+          final establishment = establishments[index];
+          return _buildEstablishmentGridCard(
+            name: establishment['name'] as String,
+            location: establishment['location'] as String,
+            offer: establishment['offer'] as String,
+            promotion: establishment['promotion'] as String,
+            price: establishment['price'] as String,
+            isActive: establishment['isActive'] as bool,
+            distance: establishment['distance'] as String,
+            rating: establishment['rating'] as double,
+          );
+        },
       ),
     );
   }
@@ -1265,6 +1325,223 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
       ),
     );
+      },
+    );
+  }
+
+  Widget _buildEstablishmentGridCard({
+    required String name,
+    required String location,
+    required String offer,
+    required String promotion,
+    required String price,
+    required bool isActive,
+    required String distance,
+    required double rating,
+  }) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Card(
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          margin: EdgeInsets.zero,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                      .withOpacity(_glowAnimation.value * 0.2),
+                  blurRadius: 12,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 3),
+                ),
+                BoxShadow(
+                  color: AppColors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: () {
+                  // TODO: Voir les détails de l'établissement
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header avec panneau jaune et icône
+                    Container(
+                      height: 100,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            _colorAnimation.value ?? const Color(0xFFFFD700),
+                            const Color(0xFFFF6B35),
+                          ],
+                        ),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                .withOpacity(_glowAnimation.value * 0.3),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 0),
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: Icon(
+                              Icons.local_drink,
+                              size: 40,
+                              color: AppColors.gray900,
+                            ),
+                          ),
+                          if (isActive)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFD700),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Actif',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Contenu
+                    Padding(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Nom
+                          Text(
+                            name,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimaryLight,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          // Localisation
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on, size: 12, color: AppColors.gray500),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  location,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          // Promotion et prix
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      promotion,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.info,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      price,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.info,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          // Distance et rating
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.star, size: 12, color: Color(0xFFFFD700)),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    rating.toStringAsFixed(1),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimaryLight,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                distance,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  color: AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
       },
     );
   }

@@ -157,7 +157,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Wrapper to handle authentication state
+/// Wrapper to handle authentication state with persistent authentication
+/// Similar to WhatsApp behavior: checks auth state on launch and redirects accordingly
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -167,6 +168,7 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   final AuthController _authController = AuthController();
+  bool _isCheckingAuth = true;
 
   // Expose authController for access from routes
   AuthController get authController => _authController;
@@ -174,23 +176,124 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
-    // Listen to auth state changes
-    _authController.authService.authStateChanges.listen((User? user) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
+    _checkInitialAuthState();
+  }
+
+  /// Check authentication state on app launch
+  /// This ensures persistent authentication like WhatsApp
+  Future<void> _checkInitialAuthState() async {
+    // Wait for Firebase Auth to initialize and check current user
+    // Firebase Auth persists authentication state automatically
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    if (mounted) {
+      setState(() {
+        _isCheckingAuth = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Check if user is authenticated
-    if (_authController.currentUser != null) {
-      // User is logged in, show home
-      return HomePage(authController: _authController);
-    } else {
-      // User is not logged in, show welcome
-      return WelcomePage(authController: _authController);
-    }
+    // Use StreamBuilder to listen to auth state changes
+    // This ensures we react to auth state changes in real-time
+    return StreamBuilder<User?>(
+      stream: _authController.authService.authStateChanges,
+      builder: (context, snapshot) {
+        // Show loading screen while checking initial auth state
+        if (_isCheckingAuth || snapshot.connectionState == ConnectionState.waiting) {
+          return const _AuthLoadingScreen();
+        }
+
+        // Check if user is authenticated
+        final user = snapshot.data ?? _authController.currentUser;
+        
+        if (user != null) {
+          // User is authenticated - go directly to Home
+          // This is the persistent auth behavior: skip auth screens
+          // No need to check profile completion, always go to Home
+          return HomePage(authController: _authController);
+        } else {
+          // User is NOT authenticated - show welcome/auth screen
+          // This is the entry point for new users
+          return WelcomePage(authController: _authController);
+        }
+      },
+    );
+  }
+}
+
+/// Loading screen shown while checking authentication state
+class _AuthLoadingScreen extends StatelessWidget {
+  const _AuthLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.lightTheme.scaffoldBackgroundColor,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // App logo
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/images/Logo.png',
+                  width: 120,
+                  height: 120,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback si le logo n'est pas trouvé
+                    return Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFFFFD700),
+                            const Color(0xFFFF6B35),
+                          ],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.local_drink,
+                        size: 60,
+                        color: Colors.white,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Loading indicator
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Chargement...',
+              style: AppTheme.lightTheme.textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
