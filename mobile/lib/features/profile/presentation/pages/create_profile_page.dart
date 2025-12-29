@@ -78,12 +78,24 @@ class _CreateProfilePageState extends State<CreateProfilePage>
       end: const Color(0xFF2196F3),
     ).animate(_animationController);
 
+    // Attribuer le PIN par défaut "1234"
+    _setDefaultPin();
+
     // Afficher le dialogue d'autorisations après 2 secondes
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         _showPermissionsDialog();
       }
     });
+  }
+
+  void _setDefaultPin() {
+    // Pré-remplir les champs PIN avec "1234" par défaut
+    const defaultPin = '1234';
+    for (int i = 0; i < 4 && i < defaultPin.length; i++) {
+      _pinControllers[i].text = defaultPin[i];
+      _confirmPinControllers[i].text = defaultPin[i];
+    }
   }
 
   @override
@@ -509,11 +521,16 @@ class _CreateProfilePageState extends State<CreateProfilePage>
       
       // photoUrl sera ajouté après l'upload en arrière-plan
       
-      if (pin.isNotEmpty) {
-        profileData['pin'] = pin; // TODO: Hasher le PIN côté backend pour plus de sécurité
+      // Attribuer le PIN par défaut "1234" si aucun PIN n'est fourni
+      final pinToSave = pin.isNotEmpty ? pin : '1234';
+      profileData['pin'] = pinToSave; // TODO: Hasher le PIN côté backend pour plus de sécurité
+      
+      // Marquer si c'est le PIN par défaut (temporaire)
+      if (pin.isEmpty) {
+        profileData['isDefaultPin'] = true;
       }
       
-      profileData['profileComplete'] = pin.isNotEmpty && 
+      profileData['profileComplete'] = pinToSave.isNotEmpty && 
                                        _selectedGender != null && 
                                        _selectedDateOfBirth != null;
       
@@ -874,25 +891,6 @@ class _CreateProfilePageState extends State<CreateProfilePage>
             const SizedBox(height: 20),
             // Date de naissance
             _buildDateOfBirthSelector(),
-            const SizedBox(height: 20),
-            // Code PIN (4 chiffres)
-            _buildPINFields(
-              label: 'Code PIN (optionnel)',
-              controllers: _pinControllers,
-              focusNodes: _pinFocusNodes,
-              isConfirm: false,
-            ),
-            const SizedBox(height: 12),
-            // Info importante sur le PIN
-            _buildPINInfoCard(),
-            const SizedBox(height: 20),
-            // Confirmation PIN
-            _buildPINFields(
-              label: 'Confirmer le code PIN',
-              controllers: _confirmPinControllers,
-              focusNodes: _confirmPinFocusNodes,
-              isConfirm: true,
-            ),
           ],
         );
       },
@@ -1285,6 +1283,67 @@ class _CreateProfilePageState extends State<CreateProfilePage>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDefaultPinWarningCard() {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Card(
+          elevation: 4,
+          shadowColor: Colors.orange.withOpacity(0.2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.orange.withOpacity(0.1),
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange[700],
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PIN temporaire',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.orange[900],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Un code PIN par défaut (1234) est attribué. Vous êtes fortement encouragé à le modifier lors de la création d\'annonces.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.orange[800],
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

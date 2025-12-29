@@ -15,10 +15,7 @@ import '../../../../core/services/firebase_service.dart';
 class ProfilePage extends StatefulWidget {
   final AuthController authController;
 
-  const ProfilePage({
-    super.key,
-    required this.authController,
-  });
+  const ProfilePage({super.key, required this.authController});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -29,12 +26,12 @@ class _ProfilePageState extends State<ProfilePage>
   late AnimationController _animationController;
   late Animation<double> _glowAnimation;
   late Animation<Color?> _colorAnimation;
-  
+
   Map<String, dynamic>? _profileData;
   bool _isLoading = true;
   bool _isEditing = false;
   bool _isSaving = false;
-  
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final List<TextEditingController> _pinControllers = List.generate(
@@ -57,7 +54,6 @@ class _ProfilePageState extends State<ProfilePage>
   DateTime? _selectedDateOfBirth;
   Uint8List? _selectedImageBytes;
   String? _currentPhotoUrl;
-  bool _hasPin = false;
 
   @override
   void initState() {
@@ -70,10 +66,7 @@ class _ProfilePageState extends State<ProfilePage>
     )..repeat(reverse: true);
 
     _glowAnimation = Tween<double>(begin: 0.3, end: 0.7).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
     _colorAnimation = ColorTween(
@@ -119,15 +112,14 @@ class _ProfilePageState extends State<ProfilePage>
           _nameController.text = _profileData?['displayName'] ?? '';
           _selectedGender = _profileData?['gender'];
           _currentPhotoUrl = _profileData?['photoUrl'] ?? user.photoURL;
-          _hasPin = _profileData?['pin'] != null && _profileData!['pin'].toString().isNotEmpty;
-          
+
           if (_profileData?['dateOfBirth'] != null) {
             final timestamp = _profileData!['dateOfBirth'];
             if (timestamp is Timestamp) {
               _selectedDateOfBirth = timestamp.toDate();
             }
           }
-          
+
           _isLoading = false;
         });
       } else {
@@ -159,12 +151,13 @@ class _ProfilePageState extends State<ProfilePage>
       );
 
       if (image != null) {
-        final Uint8List? compressed = await FlutterImageCompress.compressWithFile(
-          image.path,
-          minWidth: 800,
-          minHeight: 800,
-          quality: 85,
-        );
+        final Uint8List? compressed =
+            await FlutterImageCompress.compressWithFile(
+              image.path,
+              minWidth: 800,
+              minHeight: 800,
+              quality: 85,
+            );
 
         if (compressed != null) {
           setState(() {
@@ -210,11 +203,17 @@ class _ProfilePageState extends State<ProfilePage>
     return controllers.map((e) => e.text).join();
   }
 
-  void _onPinChanged(int index, String value, List<TextEditingController> controllers, List<FocusNode> focusNodes, {bool isConfirm = false}) {
+  void _onPinChanged(
+    int index,
+    String value,
+    List<TextEditingController> controllers,
+    List<FocusNode> focusNodes, {
+    bool isConfirm = false,
+  }) {
     // Use SchedulerBinding to defer focus changes and avoid web pointer binding issues
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      
+
       // Move to next field if digit entered
       if (value.length == 1 && index < 3) {
         Future.microtask(() {
@@ -234,7 +233,8 @@ class _ProfilePageState extends State<ProfilePage>
     });
 
     // If all fields filled and this is confirm PIN, validate
-    if (isConfirm && controllers.every((controller) => controller.text.isNotEmpty)) {
+    if (isConfirm &&
+        controllers.every((controller) => controller.text.isNotEmpty)) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final pin = _getPinValue(_pinControllers);
@@ -256,7 +256,7 @@ class _ProfilePageState extends State<ProfilePage>
     // Vérifier le PIN si fourni
     final pin = _getPinValue(_pinControllers);
     final confirmPin = _getPinValue(_confirmPinControllers);
-    
+
     if (pin.isNotEmpty || confirmPin.isNotEmpty) {
       if (pin.length != 4) {
         if (mounted) {
@@ -311,7 +311,10 @@ class _ProfilePageState extends State<ProfilePage>
 
       // Ajouter le PIN si fourni (sera hashé côté backend)
       if (pin.isNotEmpty) {
-        updateData['pin'] = pin; // TODO: Hasher le PIN côté backend pour plus de sécurité
+        updateData['pin'] =
+            pin; // TODO: Hasher le PIN côté backend pour plus de sécurité
+        // Supprimer le flag isDefaultPin si l'utilisateur modifie le PIN
+        updateData['isDefaultPin'] = FieldValue.delete();
       }
 
       String? photoUrl = _currentPhotoUrl;
@@ -562,7 +565,9 @@ class _ProfilePageState extends State<ProfilePage>
                       offset: const Offset(0, 0),
                     ),
                     BoxShadow(
-                      color: const Color(0xFF4CAF50).withOpacity(_glowAnimation.value * 0.5),
+                      color: const Color(
+                        0xFF4CAF50,
+                      ).withOpacity(_glowAnimation.value * 0.5),
                       blurRadius: 35,
                       spreadRadius: 6,
                       offset: const Offset(0, 0),
@@ -583,13 +588,18 @@ class _ProfilePageState extends State<ProfilePage>
                       backgroundImage: _selectedImageBytes != null
                           ? MemoryImage(_selectedImageBytes!)
                           : (_currentPhotoUrl != null
-                              ? NetworkImage(_currentPhotoUrl!)
-                              : null) as ImageProvider?,
-                      child: _selectedImageBytes == null && _currentPhotoUrl == null
+                                    ? NetworkImage(_currentPhotoUrl!)
+                                    : null)
+                                as ImageProvider?,
+                      child:
+                          _selectedImageBytes == null &&
+                              _currentPhotoUrl == null
                           ? Icon(
                               Icons.person,
                               size: 70,
-                              color: _colorAnimation.value ?? const Color(0xFFFFD700),
+                              color:
+                                  _colorAnimation.value ??
+                                  const Color(0xFFFFD700),
                             )
                           : null,
                     ),
@@ -641,9 +651,9 @@ class _ProfilePageState extends State<ProfilePage>
                 _isEditing
                     ? 'Modifier le profil'
                     : (user?.displayName ??
-                        _profileData?['displayName'] ??
-                        user?.phoneNumber?.replaceRange(0, 4, '****') ??
-                        'Utilisateur'),
+                          _profileData?['displayName'] ??
+                          user?.phoneNumber?.replaceRange(0, 4, '****') ??
+                          'Utilisateur'),
                 style: GoogleFonts.inter(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
@@ -652,7 +662,9 @@ class _ProfilePageState extends State<ProfilePage>
                   height: 1.2,
                   shadows: [
                     Shadow(
-                      color: const Color(0xFFFFD700).withOpacity(0.5 * _glowAnimation.value),
+                      color: const Color(
+                        0xFFFFD700,
+                      ).withOpacity(0.5 * _glowAnimation.value),
                       blurRadius: 15,
                       offset: const Offset(0, 4),
                     ),
@@ -684,7 +696,9 @@ class _ProfilePageState extends State<ProfilePage>
               color: AppColors.white,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF2196F3).withOpacity(0.1 * _glowAnimation.value),
+                  color: const Color(
+                    0xFF2196F3,
+                  ).withOpacity(0.1 * _glowAnimation.value),
                   blurRadius: 20,
                   spreadRadius: 2,
                   offset: const Offset(0, 4),
@@ -704,27 +718,12 @@ class _ProfilePageState extends State<ProfilePage>
                   _buildGenderSelector(),
                   const SizedBox(height: AppSpacing.lg),
                   _buildDateOfBirthSelector(),
-                  const SizedBox(height: AppSpacing.lg),
-                  _buildPINFields(
-                    label: _hasPin ? 'Nouveau code PIN (optionnel)' : 'Code PIN (optionnel)',
-                    controllers: _pinControllers,
-                    focusNodes: _pinFocusNodes,
-                    isConfirm: false,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildPINInfoCard(),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildPINFields(
-                    label: 'Confirmer le code PIN',
-                    controllers: _confirmPinControllers,
-                    focusNodes: _confirmPinFocusNodes,
-                    isConfirm: true,
-                  ),
                 ] else ...[
                   _buildInfoRow(
                     icon: Icons.person,
                     label: 'Nom',
-                    value: user?.displayName ??
+                    value:
+                        user?.displayName ??
                         _profileData?['displayName'] ??
                         'Non renseigné',
                     color: const Color(0xFF2196F3),
@@ -740,15 +739,19 @@ class _ProfilePageState extends State<ProfilePage>
                       color: const Color(0xFFFF6B35),
                     ),
                   ],
-                  if (_selectedDateOfBirth != null || _profileData?['dateOfBirth'] != null) ...[
+                  if (_selectedDateOfBirth != null ||
+                      _profileData?['dateOfBirth'] != null) ...[
                     const Divider(height: AppSpacing.xl),
                     _buildInfoRow(
                       icon: Icons.calendar_today,
                       label: 'Date de naissance',
-                      value: _formatDate(_selectedDateOfBirth ??
-                          (_profileData?['dateOfBirth'] is Timestamp
-                              ? (_profileData!['dateOfBirth'] as Timestamp).toDate()
-                              : null)),
+                      value: _formatDate(
+                        _selectedDateOfBirth ??
+                            (_profileData?['dateOfBirth'] is Timestamp
+                                ? (_profileData!['dateOfBirth'] as Timestamp)
+                                      .toDate()
+                                : null),
+                      ),
                       color: const Color(0xFF4CAF50),
                     ),
                   ],
@@ -768,13 +771,6 @@ class _ProfilePageState extends State<ProfilePage>
                       color: const Color(0xFF2196F3),
                     ),
                   ],
-                  const Divider(height: AppSpacing.xl),
-                  _buildInfoRow(
-                    icon: Icons.lock,
-                    label: 'Code PIN',
-                    value: _hasPin ? 'Défini' : 'Non défini',
-                    color: _hasPin ? const Color(0xFF4CAF50) : AppColors.warning,
-                  ),
                 ],
               ],
             ),
@@ -845,13 +841,9 @@ class _ProfilePageState extends State<ProfilePage>
         const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
-            Expanded(
-              child: _buildGenderOption('M', 'Homme', Icons.male),
-            ),
+            Expanded(child: _buildGenderOption('M', 'Homme', Icons.male)),
             const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: _buildGenderOption('F', 'Femme', Icons.female),
-            ),
+            Expanded(child: _buildGenderOption('F', 'Femme', Icons.female)),
           ],
         ),
       ],
@@ -877,9 +869,7 @@ class _ProfilePageState extends State<ProfilePage>
               : AppColors.gray50,
           borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
           border: Border.all(
-            color: isSelected
-                ? const Color(0xFFFF6B35)
-                : AppColors.borderLight,
+            color: isSelected ? const Color(0xFFFF6B35) : AppColors.borderLight,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -888,9 +878,7 @@ class _ProfilePageState extends State<ProfilePage>
           children: [
             Icon(
               icon,
-              color: isSelected
-                  ? const Color(0xFFFF6B35)
-                  : AppColors.gray500,
+              color: isSelected ? const Color(0xFFFF6B35) : AppColors.gray500,
               size: 20,
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -927,7 +915,9 @@ class _ProfilePageState extends State<ProfilePage>
           onTap: () async {
             final DateTime? picked = await showDatePicker(
               context: context,
-              initialDate: _selectedDateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 20)),
+              initialDate:
+                  _selectedDateOfBirth ??
+                  DateTime.now().subtract(const Duration(days: 365 * 20)),
               firstDate: DateTime(1950),
               lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)),
               builder: (context, child) {
@@ -976,10 +966,7 @@ class _ProfilePageState extends State<ProfilePage>
                   ),
                 ),
                 const Spacer(),
-                Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.gray500,
-                ),
+                Icon(Icons.arrow_drop_down, color: AppColors.gray500),
               ],
             ),
           ),
@@ -1002,11 +989,7 @@ class _ProfilePageState extends State<ProfilePage>
             color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
           ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
+          child: Icon(icon, color: color, size: 24),
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
@@ -1061,14 +1044,17 @@ class _ProfilePageState extends State<ProfilePage>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: (_colorAnimation.value ?? const Color(0xFFFFD700))
-                            .withOpacity(_glowAnimation.value),
+                        color:
+                            (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                .withOpacity(_glowAnimation.value),
                         blurRadius: 20,
                         spreadRadius: 4,
                         offset: const Offset(0, 6),
                       ),
                       BoxShadow(
-                        color: const Color(0xFF4CAF50).withOpacity(_glowAnimation.value * 0.5),
+                        color: const Color(
+                          0xFF4CAF50,
+                        ).withOpacity(_glowAnimation.value * 0.5),
                         blurRadius: 15,
                         spreadRadius: 2,
                         offset: const Offset(0, 4),
@@ -1081,7 +1067,9 @@ class _ProfilePageState extends State<ProfilePage>
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusLarge,
+                        ),
                       ),
                     ),
                     child: _isSaving
@@ -1090,13 +1078,19 @@ class _ProfilePageState extends State<ProfilePage>
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.white,
+                              ),
                             ),
                           )
                         : Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.save, color: AppColors.white, size: 20),
+                              const Icon(
+                                Icons.save,
+                                color: AppColors.white,
+                                size: 20,
+                              ),
                               const SizedBox(width: 12),
                               Text(
                                 'Sauvegarder',
@@ -1135,7 +1129,9 @@ class _ProfilePageState extends State<ProfilePage>
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.gray400, width: 2),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusLarge,
+                      ),
                     ),
                   ),
                   child: Text(
@@ -1166,7 +1162,9 @@ class _ProfilePageState extends State<ProfilePage>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF2196F3).withOpacity(0.3 * _glowAnimation.value),
+                        color: const Color(
+                          0xFF2196F3,
+                        ).withOpacity(0.3 * _glowAnimation.value),
                         blurRadius: 20,
                         spreadRadius: 4,
                         offset: const Offset(0, 6),
@@ -1183,13 +1181,19 @@ class _ProfilePageState extends State<ProfilePage>
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusLarge,
+                        ),
                       ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.edit, color: AppColors.white, size: 20),
+                        const Icon(
+                          Icons.edit,
+                          color: AppColors.white,
+                          size: 20,
+                        ),
                         const SizedBox(width: 12),
                         Text(
                           'Modifier le profil',
@@ -1216,14 +1220,13 @@ class _ProfilePageState extends State<ProfilePage>
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.error,
-                        Colors.red[700]!,
-                      ],
+                      colors: [AppColors.error, Colors.red[700]!],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.error.withOpacity(0.4 * _glowAnimation.value),
+                        color: AppColors.error.withOpacity(
+                          0.4 * _glowAnimation.value,
+                        ),
                         blurRadius: 20,
                         spreadRadius: 4,
                         offset: const Offset(0, 6),
@@ -1236,13 +1239,19 @@ class _ProfilePageState extends State<ProfilePage>
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusLarge,
+                        ),
                       ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.delete_forever, color: AppColors.white, size: 20),
+                        const Icon(
+                          Icons.delete_forever,
+                          color: AppColors.white,
+                          size: 20,
+                        ),
                         const SizedBox(width: 12),
                         Text(
                           'Supprimer le compte',
@@ -1268,13 +1277,19 @@ class _ProfilePageState extends State<ProfilePage>
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.gray400, width: 2),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusLarge,
+                      ),
                     ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.logout, color: AppColors.gray600, size: 20),
+                      const Icon(
+                        Icons.logout,
+                        color: AppColors.gray600,
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Text(
                         'Déconnexion',
@@ -1359,7 +1374,9 @@ class _ProfilePageState extends State<ProfilePage>
                       offset: const Offset(0, 4),
                     ),
                     BoxShadow(
-                      color: const Color(0xFF4CAF50).withOpacity(0.2 * _glowAnimation.value),
+                      color: const Color(
+                        0xFF4CAF50,
+                      ).withOpacity(0.2 * _glowAnimation.value),
                       blurRadius: 10,
                       spreadRadius: 1,
                       offset: const Offset(0, 2),
@@ -1375,9 +1392,7 @@ class _ProfilePageState extends State<ProfilePage>
             maxLength: 1,
             obscureText: true,
             obscuringCharacter: '●',
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-            ],
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             style: GoogleFonts.inter(
               fontSize: 36,
               fontWeight: FontWeight.w700,
@@ -1391,17 +1406,11 @@ class _ProfilePageState extends State<ProfilePage>
               fillColor: AppColors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-                borderSide: BorderSide(
-                  color: AppColors.gray400,
-                  width: 2.5,
-                ),
+                borderSide: BorderSide(color: AppColors.gray400, width: 2.5),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-                borderSide: BorderSide(
-                  color: AppColors.gray400,
-                  width: 2.5,
-                ),
+                borderSide: BorderSide(color: AppColors.gray400, width: 2.5),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
@@ -1446,11 +1455,7 @@ class _ProfilePageState extends State<ProfilePage>
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.info_outline,
-                  color: AppColors.warning,
-                  size: 24,
-                ),
+                Icon(Icons.info_outline, color: AppColors.warning, size: 24),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
