@@ -54,6 +54,42 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     4,
     (index) => FocusNode(),
   );
+  
+  // Contrôleurs pour le dialogue de connexion PIN
+  final List<TextEditingController> _loginPinControllers = List.generate(
+    4,
+    (index) => TextEditingController(),
+  );
+  final List<FocusNode> _loginPinFocusNodes = List.generate(
+    4,
+    (index) => FocusNode(),
+  );
+  
+  // Contrôleurs pour le dialogue de changement de PIN (avec ancien PIN)
+  final List<TextEditingController> _oldPinControllers = List.generate(
+    4,
+    (index) => TextEditingController(),
+  );
+  final List<TextEditingController> _newPinControllers = List.generate(
+    4,
+    (index) => TextEditingController(),
+  );
+  final List<TextEditingController> _confirmNewPinControllers = List.generate(
+    4,
+    (index) => TextEditingController(),
+  );
+  final List<FocusNode> _oldPinFocusNodes = List.generate(
+    4,
+    (index) => FocusNode(),
+  );
+  final List<FocusNode> _newPinFocusNodes = List.generate(
+    4,
+    (index) => FocusNode(),
+  );
+  final List<FocusNode> _confirmNewPinFocusNodes = List.generate(
+    4,
+    (index) => FocusNode(),
+  );
 
   @override
   void initState() {
@@ -99,6 +135,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       node.dispose();
     }
     for (var node in _confirmPinDialogFocusNodes) {
+      node.dispose();
+    }
+    for (var controller in _loginPinControllers) {
+      controller.dispose();
+    }
+    for (var node in _loginPinFocusNodes) {
+      node.dispose();
+    }
+    for (var controller in _oldPinControllers) {
+      controller.dispose();
+    }
+    for (var controller in _newPinControllers) {
+      controller.dispose();
+    }
+    for (var controller in _confirmNewPinControllers) {
+      controller.dispose();
+    }
+    for (var node in _oldPinFocusNodes) {
+      node.dispose();
+    }
+    for (var node in _newPinFocusNodes) {
+      node.dispose();
+    }
+    for (var node in _confirmNewPinFocusNodes) {
       node.dispose();
     }
     super.dispose();
@@ -1487,17 +1547,33 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       
       // Move to next field if digit entered
       if (value.length == 1 && index < 3) {
-        Future.microtask(() {
+        // Add a small delay to ensure the DOM is ready on web
+        Future.delayed(const Duration(milliseconds: 50), () {
           if (mounted && focusNodes[index + 1].canRequestFocus) {
-            focusNodes[index + 1].requestFocus();
+            // Unfocus current field first
+            focusNodes[index].unfocus();
+            // Then focus next field after a microtask
+            Future.microtask(() {
+              if (mounted && focusNodes[index + 1].canRequestFocus) {
+                focusNodes[index + 1].requestFocus();
+              }
+            });
           }
         });
       }
       // Move to previous field if deleted
       else if (value.isEmpty && index > 0) {
-        Future.microtask(() {
+        // Add a small delay to ensure the DOM is ready on web
+        Future.delayed(const Duration(milliseconds: 50), () {
           if (mounted && focusNodes[index - 1].canRequestFocus) {
-            focusNodes[index - 1].requestFocus();
+            // Unfocus current field first
+            focusNodes[index].unfocus();
+            // Then focus previous field after a microtask
+            Future.microtask(() {
+              if (mounted && focusNodes[index - 1].canRequestFocus) {
+                focusNodes[index - 1].requestFocus();
+              }
+            });
           }
         });
       }
@@ -1521,78 +1597,255 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
+  Widget _buildLoginPINField(int index, TextEditingController controller, FocusNode focusNode) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        final isFocused = focusNode.hasFocus;
+        final size = MediaQuery.of(context).size;
+        final dialogPadding = 32.0;
+        final availableWidth = size.width - dialogPadding;
+        final spacing = 8.0;
+        final totalSpacing = spacing * 3;
+        final fieldWidth = (availableWidth - totalSpacing) / 4;
+        final responsiveFieldSize = fieldWidth.clamp(50.0, 70.0);
+        
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final actualWidth = constraints.maxWidth > 0 
+                ? constraints.maxWidth.clamp(50.0, 70.0)
+                : responsiveFieldSize;
+            final actualHeight = actualWidth * 1.2;
+            
+            return Container(
+              width: actualWidth,
+              height: actualHeight,
+              margin: EdgeInsets.only(
+                right: index < 3 ? spacing : 0,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: isFocused
+                    ? [
+                        BoxShadow(
+                          color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                              .withOpacity(0.3 * _glowAnimation.value),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 4),
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFF4CAF50).withOpacity(0.2 * _glowAnimation.value),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: AppColors.gray300.withOpacity(0.3),
+                          blurRadius: 4,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+              ),
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                maxLength: 1,
+                obscureText: true,
+                obscuringCharacter: '●',
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: GoogleFonts.inter(
+                  fontSize: actualWidth * 0.55,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimaryLight,
+                  letterSpacing: 0,
+                  height: 1.2,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: AppColors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: AppColors.gray400,
+                      width: 2.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: AppColors.gray400,
+                      width: 2.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: _colorAnimation.value ?? const Color(0xFFFFD700),
+                      width: 3,
+                    ),
+                  ),
+                ),
+                onChanged: (value) => _onLoginPinChanged(index, value),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _onLoginPinChanged(int index, String value) {
+    // Use SchedulerBinding to defer focus changes and avoid web pointer binding issues
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      // Move to next field if digit entered
+      if (value.length == 1 && index < 3) {
+        // Add a small delay to ensure the DOM is ready on web
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted && _loginPinFocusNodes[index + 1].canRequestFocus) {
+            // Unfocus current field first
+            _loginPinFocusNodes[index].unfocus();
+            // Then focus next field after a microtask
+            Future.microtask(() {
+              if (mounted && _loginPinFocusNodes[index + 1].canRequestFocus) {
+                _loginPinFocusNodes[index + 1].requestFocus();
+              }
+            });
+          }
+        });
+      }
+      // Move to previous field if deleted
+      else if (value.isEmpty && index > 0) {
+        // Add a small delay to ensure the DOM is ready on web
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted && _loginPinFocusNodes[index - 1].canRequestFocus) {
+            // Unfocus current field first
+            _loginPinFocusNodes[index].unfocus();
+            // Then focus previous field after a microtask
+            Future.microtask(() {
+              if (mounted && _loginPinFocusNodes[index - 1].canRequestFocus) {
+                _loginPinFocusNodes[index - 1].requestFocus();
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
   Widget _buildDialogPINField(int index, TextEditingController controller, FocusNode focusNode, {required bool isConfirm}) {
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
         final isFocused = focusNode.hasFocus;
-        return Container(
-          width: 60,
-          height: 72,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-            boxShadow: isFocused
-                ? [
-                    BoxShadow(
-                      color: (_colorAnimation.value ?? const Color(0xFFFFD700))
-                          .withOpacity(0.3 * _glowAnimation.value),
-                      blurRadius: 15,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 4),
-                    ),
-                    BoxShadow(
-                      color: const Color(0xFF4CAF50).withOpacity(0.2 * _glowAnimation.value),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: TextField(
-            controller: controller,
-            focusNode: focusNode,
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            maxLength: 1,
-            obscureText: true,
-            obscuringCharacter: '●',
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            style: GoogleFonts.inter(
-              fontSize: 36,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimaryLight,
-              letterSpacing: 0,
-              height: 1.2,
-            ),
-            decoration: InputDecoration(
-              counterText: '',
-              filled: true,
-              fillColor: AppColors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-                borderSide: BorderSide(color: AppColors.gray400, width: 2.5),
+        final size = MediaQuery.of(context).size;
+        final dialogPadding = 32.0; // Padding du dialogue (16 * 2)
+        final availableWidth = size.width - dialogPadding;
+        final spacing = 8.0;
+        final totalSpacing = spacing * 3; // 3 espaces entre 4 champs
+        final fieldWidth = (availableWidth - totalSpacing) / 4;
+        final responsiveFieldSize = fieldWidth.clamp(50.0, 70.0);
+        
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final actualWidth = constraints.maxWidth > 0 
+                ? constraints.maxWidth.clamp(50.0, 70.0)
+                : responsiveFieldSize;
+            final actualHeight = actualWidth * 1.2;
+            
+            return Container(
+              width: actualWidth,
+              height: actualHeight,
+              margin: EdgeInsets.only(
+                right: index < 3 ? spacing : 0,
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-                borderSide: BorderSide(color: AppColors.gray400, width: 2.5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: isFocused
+                    ? [
+                        BoxShadow(
+                          color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                              .withOpacity(0.3 * _glowAnimation.value),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 4),
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFF4CAF50).withOpacity(0.2 * _glowAnimation.value),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: AppColors.gray300.withOpacity(0.3),
+                          blurRadius: 4,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-                borderSide: BorderSide(
-                  color: _colorAnimation.value ?? const Color(0xFFFFD700),
-                  width: 3,
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                maxLength: 1,
+                obscureText: true,
+                obscuringCharacter: '●',
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: GoogleFonts.inter(
+                  fontSize: actualWidth * 0.55,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimaryLight,
+                  letterSpacing: 0,
+                  height: 1.2,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: AppColors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: AppColors.gray400,
+                      width: 2.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: AppColors.gray400,
+                      width: 2.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: _colorAnimation.value ?? const Color(0xFFFFD700),
+                      width: 3,
+                    ),
+                  ),
+                ),
+                onChanged: (value) => _onPinDialogChanged(
+                  index,
+                  value,
+                  isConfirm ? _confirmPinDialogControllers : _pinDialogControllers,
+                  isConfirm ? _confirmPinDialogFocusNodes : _pinDialogFocusNodes,
+                  isConfirm: isConfirm,
                 ),
               ),
-            ),
-            onChanged: (value) => _onPinDialogChanged(
-              index,
-              value,
-              isConfirm ? _confirmPinDialogControllers : _pinDialogControllers,
-              isConfirm ? _confirmPinDialogFocusNodes : _pinDialogFocusNodes,
-              isConfirm: isConfirm,
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -2021,14 +2274,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: List.generate(
                           4,
-                          (index) => _buildDialogPINField(
-                            index,
-                            _confirmPinDialogControllers[index],
-                            _confirmPinDialogFocusNodes[index],
-                            isConfirm: true,
+                          (index) => Flexible(
+                            child: _buildDialogPINField(
+                              index,
+                              _confirmPinDialogControllers[index],
+                              _confirmPinDialogFocusNodes[index],
+                              isConfirm: true,
+                            ),
                           ),
                         ),
                       ),
@@ -2134,43 +2389,56 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   void _showModifiedPinDialog() {
+    // Réinitialiser les champs de connexion
+    for (var controller in _loginPinControllers) {
+      controller.clear();
+    }
+
     showDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.6),
-      builder: (context) => AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
+      builder: (context) {
+        // Auto-focus sur le premier champ après un court délai
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            _loginPinFocusNodes[0].requestFocus();
+          }
+        });
+        return AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, child) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.white,
-                    AppColors.offWhite,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.white,
+                      AppColors.offWhite,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                          .withOpacity(0.2 * _glowAnimation.value),
+                      blurRadius: 30,
+                      spreadRadius: 5,
+                      offset: const Offset(0, 10),
+                    ),
                   ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.success.withOpacity(0.2 * _glowAnimation.value),
-                    blurRadius: 30,
-                    spreadRadius: 5,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     // Header avec icône animée
                     Row(
                       children: [
@@ -2181,14 +2449,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
-                                AppColors.success,
-                                const Color(0xFF4CAF50),
+                                _colorAnimation.value ?? const Color(0xFFFFD700),
+                                const Color(0xFFFF6B35),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.success.withOpacity(0.3 * _glowAnimation.value),
+                                color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                    .withOpacity(0.3 * _glowAnimation.value),
                                 blurRadius: 15,
                                 spreadRadius: 2,
                                 offset: const Offset(0, 4),
@@ -2196,7 +2465,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             ],
                           ),
                           child: const Icon(
-                            Icons.check_circle,
+                            Icons.lock,
                             color: AppColors.white,
                             size: 32,
                           ),
@@ -2204,7 +2473,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: Text(
-                            'Code PIN configuré',
+                            'Se connecter avec votre code PIN',
                             style: GoogleFonts.inter(
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
@@ -2215,65 +2484,28 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    // Message principal
+                    const SizedBox(height: AppSpacing.xl),
+                    // Champ Code PIN
                     Text(
-                      'Votre code PIN a été modifié avec succès.',
+                      'Code PIN',
                       style: GoogleFonts.inter(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimaryLight,
-                        height: 1.5,
+                        color: AppColors.textSecondaryLight,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    // Carte de confirmation
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.success.withOpacity(0.15),
-                            AppColors.success.withOpacity(0.05),
-                          ],
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(
+                        4,
+                        (index) => Flexible(
+                          child: _buildLoginPINField(
+                            index,
+                            _loginPinControllers[index],
+                            _loginPinFocusNodes[index],
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-                        border: Border.all(
-                          color: AppColors.success.withOpacity(0.4),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.success.withOpacity(0.1 * _glowAnimation.value),
-                            blurRadius: 10,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.security,
-                            color: AppColors.success,
-                            size: 24,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              'Vous pouvez maintenant créer des annonces en toute sécurité.',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.success,
-                                height: 1.5,
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xl),
@@ -2282,7 +2514,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () {
+                              // Réinitialiser les champs
+                              for (var controller in _loginPinControllers) {
+                                controller.clear();
+                              }
+                              Navigator.pop(context);
+                            },
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(
                                 color: AppColors.gray400,
@@ -2312,14 +2550,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  AppColors.success,
-                                  const Color(0xFF4CAF50),
+                                  _colorAnimation.value ?? const Color(0xFFFFD700),
+                                  const Color(0xFFFF6B35),
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.success.withOpacity(0.4 * _glowAnimation.value),
+                                  color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                      .withOpacity(0.4 * _glowAnimation.value),
                                   blurRadius: 15,
                                   spreadRadius: 2,
                                   offset: const Offset(0, 6),
@@ -2327,10 +2566,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ],
                             ),
                             child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                // TODO: Ouvrir la page annonceur
-                              },
+                              onPressed: () => _verifyLoginPin(),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.transparent,
                                 shadowColor: Colors.transparent,
@@ -2342,7 +2578,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.business, color: AppColors.white, size: 20),
+                                  const Icon(Icons.arrow_forward, color: AppColors.white, size: 20),
                                   const SizedBox(width: AppSpacing.sm),
                                   Text(
                                     'Continuer',
@@ -2359,7 +2595,371 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ],
                     ),
+                    const SizedBox(height: AppSpacing.md),
+                    // Bouton discret "Changer le code PIN"
+                    Center(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showChangePinDialog();
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm,
+                          ),
+                        ),
+                        child: Text(
+                          'Changer le code PIN',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.gray600,
+                            decoration: TextDecoration.underline,
+                            decorationColor: AppColors.gray600,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _verifyLoginPin() async {
+    final enteredPin = _getPinDialogValue(_loginPinControllers);
+
+    if (enteredPin.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez entrer votre code PIN complet'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final user = widget.authController.currentUser;
+      if (user == null) return;
+
+      // Récupérer le PIN depuis Firestore
+      final doc = await FirebaseService.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!doc.exists) {
+        _showErrorDialog('Profil utilisateur introuvable.');
+        return;
+      }
+
+      final profileData = doc.data();
+      final storedPin = profileData?['pin']?.toString() ?? '';
+
+      if (enteredPin == storedPin) {
+        // PIN correct, fermer le dialogue et ouvrir la page annonceur
+        for (var controller in _loginPinControllers) {
+          controller.clear();
+        }
+        if (mounted) {
+          Navigator.pop(context);
+          // TODO: Ouvrir la page annonceur
+        }
+      } else {
+        // PIN incorrect
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Code PIN incorrect. Veuillez réessayer.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        // Réinitialiser les champs
+        for (var controller in _loginPinControllers) {
+          controller.clear();
+        }
+        _loginPinFocusNodes[0].requestFocus();
+      }
+    } catch (e) {
+      _showErrorDialog('Erreur lors de la vérification: $e');
+    }
+  }
+
+  void _showChangePinDialog() {
+    // Réinitialiser tous les champs
+    for (var controller in _oldPinControllers) {
+      controller.clear();
+    }
+    for (var controller in _newPinControllers) {
+      controller.clear();
+    }
+    for (var controller in _confirmNewPinControllers) {
+      controller.clear();
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) => AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.white,
+                    AppColors.offWhite,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                        .withOpacity(0.2 * _glowAnimation.value),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.sm + 2),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  _colorAnimation.value ?? const Color(0xFFFFD700),
+                                  const Color(0xFFFF6B35),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                      .withOpacity(0.3 * _glowAnimation.value),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.lock_reset,
+                              color: AppColors.white,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Text(
+                              'Changer le code PIN',
+                              style: GoogleFonts.inter(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimaryLight,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Ancien PIN
+                      Text(
+                        'Ancien code PIN',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: List.generate(
+                          4,
+                          (index) => Flexible(
+                            child: _buildChangePinField(
+                              index,
+                              _oldPinControllers[index],
+                              _oldPinFocusNodes[index],
+                              isOldPin: true,
+                              focusNodesList: _oldPinFocusNodes,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Nouveau PIN
+                      Text(
+                        'Nouveau code PIN',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: List.generate(
+                          4,
+                          (index) => Flexible(
+                            child: _buildChangePinField(
+                              index,
+                              _newPinControllers[index],
+                              _newPinFocusNodes[index],
+                              isOldPin: false,
+                              focusNodesList: _newPinFocusNodes,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Confirmer nouveau PIN
+                      Text(
+                        'Confirmer le nouveau code PIN',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: List.generate(
+                          4,
+                          (index) => Flexible(
+                            child: _buildChangePinField(
+                              index,
+                              _confirmNewPinControllers[index],
+                              _confirmNewPinFocusNodes[index],
+                              isOldPin: false,
+                              focusNodesList: _confirmNewPinFocusNodes,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Boutons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                // Réinitialiser les champs
+                                for (var controller in _oldPinControllers) {
+                                  controller.clear();
+                                }
+                                for (var controller in _newPinControllers) {
+                                  controller.clear();
+                                }
+                                for (var controller in _confirmNewPinControllers) {
+                                  controller.clear();
+                                }
+                                Navigator.pop(context);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: AppColors.gray400,
+                                  width: 2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                              ),
+                              child: Text(
+                                'Annuler',
+                                style: GoogleFonts.inter(
+                                  color: AppColors.gray600,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            flex: 2,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    _colorAnimation.value ?? const Color(0xFFFFD700),
+                                    const Color(0xFFFF6B35),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                        .withOpacity(0.4 * _glowAnimation.value),
+                                    blurRadius: 15,
+                                    spreadRadius: 2,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _saveChangePin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.save, color: AppColors.white, size: 20),
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Text(
+                                      'Sauvegarder',
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                        color: AppColors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -2367,6 +2967,303 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         },
       ),
     );
+  }
+
+  Widget _buildChangePinField(int index, TextEditingController controller, FocusNode focusNode, {required bool isOldPin, required List<FocusNode> focusNodesList}) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        final isFocused = focusNode.hasFocus;
+        final size = MediaQuery.of(context).size;
+        final dialogPadding = 32.0;
+        final availableWidth = size.width - dialogPadding;
+        final spacing = 8.0;
+        final totalSpacing = spacing * 3;
+        final fieldWidth = (availableWidth - totalSpacing) / 4;
+        final responsiveFieldSize = fieldWidth.clamp(50.0, 70.0);
+        
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final actualWidth = constraints.maxWidth > 0 
+                ? constraints.maxWidth.clamp(50.0, 70.0)
+                : responsiveFieldSize;
+            final actualHeight = actualWidth * 1.2;
+            
+            return Container(
+              width: actualWidth,
+              height: actualHeight,
+              margin: EdgeInsets.only(
+                right: index < 3 ? spacing : 0,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: isFocused
+                    ? [
+                        BoxShadow(
+                          color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                              .withOpacity(0.3 * _glowAnimation.value),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 4),
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFF4CAF50).withOpacity(0.2 * _glowAnimation.value),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: AppColors.gray300.withOpacity(0.3),
+                          blurRadius: 4,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+              ),
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                maxLength: 1,
+                obscureText: true,
+                obscuringCharacter: '●',
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: GoogleFonts.inter(
+                  fontSize: actualWidth * 0.55,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimaryLight,
+                  letterSpacing: 0,
+                  height: 1.2,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: AppColors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: AppColors.gray400,
+                      width: 2.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: AppColors.gray400,
+                      width: 2.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: _colorAnimation.value ?? const Color(0xFFFFD700),
+                      width: 3,
+                    ),
+                  ),
+                ),
+                onChanged: (value) => _onChangePinChanged(
+                  index,
+                  value,
+                  focusNodesList,
+                  isOldPin: isOldPin,
+                  isNewPin: !isOldPin && focusNodesList == _newPinFocusNodes,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _onChangePinChanged(int index, String value, List<FocusNode> focusNodes, {bool isOldPin = false, bool isNewPin = false}) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      // Move to next field if digit entered
+      if (value.length == 1 && index < 3) {
+        // Add a small delay to ensure the DOM is ready on web
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted && focusNodes[index + 1].canRequestFocus) {
+            // Unfocus current field first
+            focusNodes[index].unfocus();
+            // Then focus next field after a microtask
+            Future.microtask(() {
+              if (mounted && focusNodes[index + 1].canRequestFocus) {
+                focusNodes[index + 1].requestFocus();
+              }
+            });
+          }
+        });
+      }
+      // Move to previous field if deleted
+      else if (value.isEmpty && index > 0) {
+        // Add a small delay to ensure the DOM is ready on web
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted && focusNodes[index - 1].canRequestFocus) {
+            // Unfocus current field first
+            focusNodes[index].unfocus();
+            // Then focus previous field after a microtask
+            Future.microtask(() {
+              if (mounted && focusNodes[index - 1].canRequestFocus) {
+                focusNodes[index - 1].requestFocus();
+              }
+            });
+          }
+        });
+      }
+      // Si tous les champs sont remplis, passer au groupe suivant
+      else if (value.length == 1 && index == 3) {
+        // Vérifier si tous les champs sont remplis
+        bool allFilled = true;
+        for (int i = 0; i < 4; i++) {
+          if (focusNodes[i].hasFocus) {
+            // Vérifier le contrôleur correspondant
+            TextEditingController? controller;
+            if (isOldPin) {
+              controller = _oldPinControllers[i];
+            } else if (isNewPin) {
+              controller = _newPinControllers[i];
+            } else {
+              controller = _confirmNewPinControllers[i];
+            }
+            if (controller.text.isEmpty) {
+              allFilled = false;
+              break;
+            }
+          }
+        }
+        
+        if (allFilled) {
+          // Add a delay before moving to next group
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              // Unfocus current field first
+              focusNodes[index].unfocus();
+              // Then focus first field of next group after a microtask
+              Future.microtask(() {
+                if (mounted) {
+                  // Passer au groupe suivant
+                  if (isOldPin) {
+                    _newPinFocusNodes[0].requestFocus();
+                  } else if (isNewPin) {
+                    _confirmNewPinFocusNodes[0].requestFocus();
+                  }
+                }
+              });
+            }
+          });
+        }
+      }
+    });
+  }
+
+  Future<void> _saveChangePin() async {
+    final oldPin = _getPinDialogValue(_oldPinControllers);
+    final newPin = _getPinDialogValue(_newPinControllers);
+    final confirmNewPin = _getPinDialogValue(_confirmNewPinControllers);
+
+    if (oldPin.length != 4 || newPin.length != 4 || confirmNewPin.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tous les champs doivent être remplis'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (newPin != confirmNewPin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Les nouveaux codes PIN ne correspondent pas'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (newPin == '1234') {
+      _showDefaultPinRejectedDialog();
+      return;
+    }
+
+    try {
+      final user = widget.authController.currentUser;
+      if (user == null) return;
+
+      // Vérifier l'ancien PIN
+      final doc = await FirebaseService.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!doc.exists) {
+        _showErrorDialog('Profil utilisateur introuvable.');
+        return;
+      }
+
+      final profileData = doc.data();
+      final storedPin = profileData?['pin']?.toString() ?? '';
+
+      if (oldPin != storedPin) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ancien code PIN incorrect'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        // Réinitialiser seulement l'ancien PIN
+        for (var controller in _oldPinControllers) {
+          controller.clear();
+        }
+        _oldPinFocusNodes[0].requestFocus();
+        return;
+      }
+
+      // Sauvegarder le nouveau PIN
+      await FirebaseService.firestore
+          .collection('users')
+          .doc(user.uid)
+          .update({
+        'pin': newPin,
+        'isDefaultPin': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Réinitialiser tous les champs
+      for (var controller in _oldPinControllers) {
+        controller.clear();
+      }
+      for (var controller in _newPinControllers) {
+        controller.clear();
+      }
+      for (var controller in _confirmNewPinControllers) {
+        controller.clear();
+      }
+
+      if (mounted) {
+        Navigator.pop(context); // Fermer le dialogue de changement
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Code PIN modifié avec succès'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sauvegarde: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   void _showErrorDialog(String message) {
