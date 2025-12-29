@@ -2947,7 +2947,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }
         if (mounted) {
           Navigator.pop(context);
-          // TODO: Ouvrir la page annonceur
+          // Navigate to advertiser management page
+          Navigator.pushNamed(context, AppRoutes.advertiserManagement);
         }
       } else {
         // PIN incorrect

@@ -15,6 +15,7 @@ import 'auth/ui/welcome_page.dart';
 import 'features/profile/presentation/pages/profile_page.dart';
 import 'features/profile/presentation/pages/create_profile_page.dart';
 import 'features/home/presentation/pages/home_page.dart';
+import 'features/advertiser/presentation/pages/advertiser_management_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -115,6 +116,13 @@ class MyApp extends StatelessWidget {
               authWrapperState?.authController ?? AuthController();
           return ProfilePage(authController: authController);
         },
+        AppRoutes.advertiserManagement: (context) {
+          final authWrapperState = context
+              .findAncestorStateOfType<_AuthWrapperState>();
+          final authController =
+              authWrapperState?.authController ?? AuthController();
+          return AdvertiserManagementPage(authController: authController);
+        },
       },
       onGenerateRoute: (settings) {
         // Handle routes that need parameters
@@ -147,6 +155,16 @@ class MyApp extends StatelessWidget {
                 final authController =
                     authWrapperState?.authController ?? AuthController();
                 return ProfilePage(authController: authController);
+              },
+            );
+          case AppRoutes.advertiserManagement:
+            return MaterialPageRoute(
+              builder: (context) {
+                final authWrapperState = context
+                    .findAncestorStateOfType<_AuthWrapperState>();
+                final authController =
+                    authWrapperState?.authController ?? AuthController();
+                return AdvertiserManagementPage(authController: authController);
               },
             );
           default:
