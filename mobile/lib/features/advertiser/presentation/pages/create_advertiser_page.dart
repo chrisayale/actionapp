@@ -1,8 +1,12 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../auth/auth_controller.dart';
+import '../../../../core/services/permission_service.dart';
 
 /// Multi-step registration form for creating a new advertiser establishment
 class CreateAdvertiserPage extends StatefulWidget {
@@ -26,24 +30,48 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
 
   // Form controllers
   final _nameController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _quartierController = TextEditingController();
+  final _avenueController = TextEditingController();
+  final _numeroController = TextEditingController();
 
   // Form keys for validation
   final _step1Key = GlobalKey<FormState>();
   final _step2Key = GlobalKey<FormState>();
-  final _step3Key = GlobalKey<FormState>();
 
-  String? _selectedCategory;
+  // Dropdown values
+  String? _selectedType;
+  String? _selectedVille;
 
-  final List<String> _categories = [
-    'Restaurant',
+  // Image files
+  Uint8List? _logoImageBytes;
+  Uint8List? _enseigneImageBytes;
+  Uint8List? _documentImageBytes;
+
+  // Location
+  double? _latitude;
+  double? _longitude;
+
+  // Lists
+  final List<String> _establishmentTypes = [
     'Bar',
-    'Café',
-    'Night Club',
+    'Terrasse',
+    'Restaurant',
+    'Club',
     'Hôtel',
+    'Café',
+    'Autre',
+  ];
+
+  final List<String> _villes = [
+    'Kinshasa',
+    'Lubumbashi',
+    'Mbuji-Mayi',
+    'Kisangani',
+    'Kananga',
+    'Bukavu',
+    'Goma',
+    'Matadi',
+    'Kolwezi',
     'Autre',
   ];
 
@@ -65,22 +93,26 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
   void dispose() {
     _animationController.dispose();
     _nameController.dispose();
-    _locationController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _descriptionController.dispose();
+    _quartierController.dispose();
+    _avenueController.dispose();
+    _numeroController.dispose();
     super.dispose();
   }
 
   bool get _canContinue {
     switch (_currentStep) {
       case 0:
-        return _nameController.text.trim().isNotEmpty &&
-            _locationController.text.trim().isNotEmpty;
+        return _selectedType != null &&
+            _nameController.text.trim().isNotEmpty &&
+            _logoImageBytes != null &&
+            _enseigneImageBytes != null;
       case 1:
-        return _phoneController.text.trim().isNotEmpty;
-      case 2:
-        return _selectedCategory != null;
+        return _selectedVille != null &&
+            _quartierController.text.trim().isNotEmpty &&
+            _avenueController.text.trim().isNotEmpty &&
+            _numeroController.text.trim().isNotEmpty &&
+            _latitude != null &&
+            _longitude != null;
       default:
         return false;
     }
@@ -95,11 +127,6 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
         break;
       case 1:
         if (_step2Key.currentState?.validate() ?? false) {
-          _goToStep(2);
-        }
-        break;
-      case 2:
-        if (_step3Key.currentState?.validate() ?? false) {
           _submitForm();
         }
         break;
@@ -125,6 +152,279 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
       });
     } else {
       Navigator.pop(context);
+    }
+  }
+
+  Future<void> _pickImage(ImageSource source, Function(Uint8List) onImagePicked) async {
+    // Check permissions
+    bool hasPermission = false;
+    if (source == ImageSource.camera) {
+      hasPermission = await PermissionService.isCameraPermissionGranted();
+      if (!hasPermission) {
+        hasPermission = await PermissionService.requestCameraPermission();
+      }
+    } else {
+      hasPermission = await PermissionService.isPhotoLibraryPermissionGranted();
+      if (!hasPermission) {
+        hasPermission = await PermissionService.requestPhotoLibraryPermission();
+      }
+    }
+
+    if (!hasPermission) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    source == ImageSource.camera
+                        ? 'Permission de la caméra requise'
+                        : 'Permission de la galerie requise',
+                    style: GoogleFonts.inter(),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.warning,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        final Uint8List? compressed = await FlutterImageCompress.compressWithFile(
+          image.path,
+          minWidth: 1200,
+          minHeight: 1200,
+          quality: 85,
+        );
+
+        if (compressed != null) {
+          onImagePicked(compressed);
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sélection: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showImageSourceDialog(Function(Uint8List) onImagePicked) async {
+    await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusXLarge),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.md),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.gray300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Text(
+                  'Choisir une source',
+                  style: GoogleFonts.inter(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+                  ),
+                  child: const Icon(Icons.photo_library, color: AppColors.info),
+                ),
+                title: Text(
+                  'Galerie',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  'Choisir depuis vos photos',
+                  style: GoogleFonts.inter(fontSize: 13),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery, onImagePicked);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+                  ),
+                  child: const Icon(Icons.camera_alt, color: AppColors.success),
+                ),
+                title: Text(
+                  'Caméra',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  'Prendre une nouvelle photo',
+                  style: GoogleFonts.inter(fontSize: 13),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera, onImagePicked);
+                },
+              ),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + AppSpacing.md),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickLocation() async {
+    // Request location permission
+    bool hasPermission = await PermissionService.isLocationPermissionGranted();
+    if (!hasPermission) {
+      hasPermission = await PermissionService.requestLocationPermission();
+    }
+
+    if (!hasPermission) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Permission de localisation requise',
+                    style: GoogleFonts.inter(),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.warning,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Mock implementation - show dialog for location picker
+    // In a real app, you would open a map picker here
+    final result = await showDialog<Map<String, double>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.map, color: AppColors.yellowPrimary),
+            const SizedBox(width: AppSpacing.sm),
+            Text(
+              'Localisation',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Fonctionnalité de sélection de carte à implémenter.\n\nPour l\'instant, utilisez un point de localisation par défaut.',
+          style: GoogleFonts.inter(
+            fontSize: 15,
+            color: AppColors.textSecondaryLight,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Annuler',
+              style: GoogleFonts.inter(
+                color: AppColors.textSecondaryLight,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // Mock coordinates (Kinshasa center)
+              Navigator.pop(context, {
+                'latitude': -4.3276,
+                'longitude': 15.3136,
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.yellowPrimary,
+              foregroundColor: AppColors.textPrimaryLight,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+              ),
+              elevation: 0,
+            ),
+            child: Text(
+              'Utiliser la localisation',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _latitude = result['latitude'];
+        _longitude = result['longitude'];
+      });
     }
   }
 
@@ -163,7 +463,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           ),
         );
 
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -244,9 +544,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
             )
           : Column(
               children: [
-                // Progress indicator
                 _buildProgressIndicator(),
-                // Content
                 Expanded(
                   child: FadeTransition(
                     opacity: _fadeAnimation,
@@ -256,7 +554,6 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                     ),
                   ),
                 ),
-                // Bottom navigation
                 _buildBottomNavigation(),
               ],
             ),
@@ -273,7 +570,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
       child: Column(
         children: [
           Row(
-            children: List.generate(3, (index) {
+            children: List.generate(2, (index) {
               final isCompleted = index < _currentStep;
               final isCurrent = index == _currentStep;
               return Expanded(
@@ -291,7 +588,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                         ),
                       ),
                     ),
-                    if (index < 2) const SizedBox(width: 8),
+                    if (index < 1) const SizedBox(width: 8),
                   ],
                 ),
               );
@@ -301,9 +598,8 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStepLabel(0, 'Informations'),
-              _buildStepLabel(1, 'Coordonnées'),
-              _buildStepLabel(2, 'Détails'),
+              _buildStepLabel(0, 'Établissement'),
+              _buildStepLabel(1, 'Localisation'),
             ],
           ),
         ],
@@ -317,7 +613,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
     return AnimatedDefaultTextStyle(
       duration: const Duration(milliseconds: 300),
       style: GoogleFonts.inter(
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: isCurrent || isCompleted ? FontWeight.w600 : FontWeight.w400,
         color: isCurrent || isCompleted
             ? AppColors.yellowPrimary
@@ -333,8 +629,6 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
         return _buildStep1();
       case 1:
         return _buildStep2();
-      case 2:
-        return _buildStep3();
       default:
         return const SizedBox.shrink();
     }
@@ -349,15 +643,36 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           const SizedBox(height: AppSpacing.xl),
           _buildSectionHeader(
             icon: Icons.business_rounded,
-            title: 'Informations de base',
-            subtitle: 'Renseignez les informations principales de votre établissement',
+            title: 'Informations de l\'établissement',
+            subtitle: 'Renseignez les informations principales',
           ),
           const SizedBox(height: AppSpacing.xl),
+          _buildDropdownField(
+            label: 'Type d\'établissement',
+            hint: 'Sélectionner un type',
+            icon: Icons.category_rounded,
+            value: _selectedType,
+            items: _establishmentTypes,
+            required: true,
+            onChanged: (value) {
+              setState(() {
+                _selectedType = value;
+              });
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Veuillez sélectionner un type d\'établissement';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
           _buildTextField(
             controller: _nameController,
             label: 'Nom de l\'établissement',
             hint: 'Ex: RDC BAR',
             icon: Icons.store_rounded,
+            required: true,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Veuillez entrer le nom de l\'établissement';
@@ -369,16 +684,52 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
             },
           ),
           const SizedBox(height: AppSpacing.lg),
-          _buildTextField(
-            controller: _locationController,
-            label: 'Localisation',
-            hint: 'Ex: KAVA/GOMBE, Kinshasa',
-            icon: Icons.location_on_rounded,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Veuillez entrer la localisation';
+          _buildImagePickerField(
+            label: 'Logo',
+            icon: Icons.image_rounded,
+            imageBytes: _logoImageBytes,
+            required: true,
+            onImagePicked: (bytes) {
+              setState(() {
+                _logoImageBytes = bytes;
+              });
+            },
+            validator: () {
+              if (_logoImageBytes == null) {
+                return 'Veuillez sélectionner un logo';
               }
               return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _buildImagePickerField(
+            label: 'Image marque / enseigne',
+            icon: Icons.storefront_rounded,
+            imageBytes: _enseigneImageBytes,
+            required: true,
+            onImagePicked: (bytes) {
+              setState(() {
+                _enseigneImageBytes = bytes;
+              });
+            },
+            validator: () {
+              if (_enseigneImageBytes == null) {
+                return 'Veuillez sélectionner une image d\'enseigne';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _buildImagePickerField(
+            label: 'Document',
+            subtitle: 'RCCM / ID National / Patente',
+            icon: Icons.description_rounded,
+            imageBytes: _documentImageBytes,
+            required: false,
+            onImagePicked: (bytes) {
+              setState(() {
+                _documentImageBytes = bytes;
+              });
             },
           ),
           const SizedBox(height: AppSpacing.xl),
@@ -395,92 +746,77 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
         children: [
           const SizedBox(height: AppSpacing.xl),
           _buildSectionHeader(
-            icon: Icons.contact_phone_rounded,
-            title: 'Coordonnées',
-            subtitle: 'Comment pouvez-vous être contacté ?',
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          _buildTextField(
-            controller: _phoneController,
-            label: 'Numéro de téléphone',
-            hint: '+243 900 000 000',
-            icon: Icons.phone_rounded,
-            keyboardType: TextInputType.phone,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Veuillez entrer un numéro de téléphone';
-              }
-              final phoneRegex = RegExp(r'^\+?[0-9\s\-]{8,}$');
-              if (!phoneRegex.hasMatch(value.trim())) {
-                return 'Veuillez entrer un numéro valide';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _buildTextField(
-            controller: _emailController,
-            label: 'Email (optionnel)',
-            hint: 'contact@exemple.com',
-            icon: Icons.email_rounded,
-            keyboardType: TextInputType.emailAddress,
-            validator: (value) {
-              if (value != null && value.trim().isNotEmpty) {
-                final emailRegex = RegExp(
-                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                );
-                if (!emailRegex.hasMatch(value.trim())) {
-                  return 'Veuillez entrer un email valide';
-                }
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: AppSpacing.xl),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep3() {
-    return Form(
-      key: _step3Key,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: AppSpacing.xl),
-          _buildSectionHeader(
-            icon: Icons.info_outline_rounded,
-            title: 'Détails supplémentaires',
-            subtitle: 'Ajoutez des informations complémentaires',
+            icon: Icons.location_on_rounded,
+            title: 'Informations de localisation',
+            subtitle: 'Où se trouve votre établissement ?',
           ),
           const SizedBox(height: AppSpacing.xl),
           _buildDropdownField(
-            label: 'Catégorie',
-            hint: 'Sélectionner une catégorie',
-            icon: Icons.category_rounded,
-            value: _selectedCategory,
-            items: _categories,
+            label: 'Ville',
+            hint: 'Sélectionner une ville',
+            icon: Icons.location_city_rounded,
+            value: _selectedVille,
+            items: _villes,
+            required: true,
             onChanged: (value) {
               setState(() {
-                _selectedCategory = value;
+                _selectedVille = value;
               });
             },
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Veuillez sélectionner une catégorie';
+                return 'Veuillez sélectionner une ville';
               }
               return null;
             },
           ),
           const SizedBox(height: AppSpacing.lg),
           _buildTextField(
-            controller: _descriptionController,
-            label: 'Description (optionnel)',
-            hint: 'Décrivez votre établissement...',
-            icon: Icons.description_rounded,
-            maxLines: 5,
+            controller: _quartierController,
+            label: 'Quartier / Commune',
+            hint: 'Ex: GOMBE',
+            icon: Icons.apartment_rounded,
+            required: true,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Veuillez entrer le quartier/commune';
+              }
+              return null;
+            },
           ),
+          const SizedBox(height: AppSpacing.lg),
+          _buildTextField(
+            controller: _avenueController,
+            label: 'Avenue',
+            hint: 'Ex: Avenue de la République',
+            icon: Icons.signpost_rounded,
+            required: true,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Veuillez entrer l\'avenue';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _buildTextField(
+            controller: _numeroController,
+            label: 'Numéro',
+            hint: 'Ex: 123',
+            icon: Icons.numbers_rounded,
+            keyboardType: TextInputType.number,
+            required: true,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Veuillez entrer le numéro';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _buildLocationPickerField(),
+          const SizedBox(height: AppSpacing.lg),
+          _buildInfoCard(),
           const SizedBox(height: AppSpacing.xl),
         ],
       ),
@@ -557,27 +893,41 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
     required String hint,
     required IconData icon,
     TextInputType? keyboardType,
-    int maxLines = 1,
+    required bool required,
     String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: AppColors.textPrimaryLight,
-          ),
+        Row(
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: AppColors.textPrimaryLight,
+              ),
+            ),
+            if (required) ...[
+              const SizedBox(width: 4),
+              Text(
+                '*',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: AppSpacing.sm),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
-          maxLines: maxLines,
           validator: validator,
-          onChanged: (_) => setState(() {}), // Rebuild to update button state
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: GoogleFonts.inter(
@@ -633,19 +983,35 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
     required IconData icon,
     required String? value,
     required List<String> items,
+    required bool required,
     required Function(String?) onChanged,
     String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: AppColors.textPrimaryLight,
-          ),
+        Row(
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: AppColors.textPrimaryLight,
+              ),
+            ),
+            if (required) ...[
+              const SizedBox(width: 4),
+              Text(
+                '*',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: AppSpacing.sm),
         DropdownButtonFormField<String>(
@@ -704,7 +1070,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           }).toList(),
           onChanged: (newValue) {
             onChanged(newValue);
-            setState(() {}); // Rebuild to update button state
+            setState(() {});
           },
           validator: validator,
           icon: Icon(
@@ -713,6 +1079,216 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildImagePickerField({
+    required String label,
+    String? subtitle,
+    required IconData icon,
+    required Uint8List? imageBytes,
+    required bool required,
+    required Function(Uint8List) onImagePicked,
+    String? Function()? validator,
+  }) {
+    final errorMessage = validator?.call();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: AppColors.textPrimaryLight,
+              ),
+            ),
+            if (required) ...[
+              const SizedBox(width: 4),
+              Text(
+                '*',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppColors.textTertiaryLight,
+            ),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.sm),
+        GestureDetector(
+          onTap: () => _showImageSourceDialog(onImagePicked),
+          child: Container(
+            height: 150,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+              border: Border.all(
+                color: errorMessage != null ? AppColors.error : AppColors.gray200,
+                width: errorMessage != null ? 2 : 1,
+              ),
+            ),
+            child: imageBytes == null
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        icon,
+                        color: AppColors.yellowPrimary,
+                        size: 48,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'Appuyez pour sélectionner',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                    child: Image.memory(
+                      imageBytes,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: 150,
+                    ),
+                  ),
+          ),
+        ),
+        if (errorMessage != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            errorMessage,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppColors.error,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLocationPickerField() {
+    final hasLocation = _latitude != null && _longitude != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Localisation sur la carte',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: AppColors.textPrimaryLight,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '*',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: AppColors.error,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        ElevatedButton.icon(
+          onPressed: _pickLocation,
+          icon: Icon(
+            hasLocation ? Icons.check_circle : Icons.map_rounded,
+            size: 22,
+          ),
+          label: Text(
+            hasLocation ? 'Localisation définie' : 'Prendre la localisation sur la carte',
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: hasLocation
+                ? AppColors.success.withOpacity(0.1)
+                : AppColors.yellowPrimary,
+            foregroundColor: hasLocation ? AppColors.success : AppColors.textPrimaryLight,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md + 2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+              side: hasLocation
+                  ? const BorderSide(color: AppColors.success, width: 2)
+                  : BorderSide.none,
+            ),
+            elevation: 0,
+          ),
+        ),
+        if (_latitude != null && _longitude != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Lat: $_latitude, Long: $_longitude',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppColors.textTertiaryLight,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.info.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+        border: Border.all(
+          color: AppColors.info.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            color: AppColors.info,
+            size: 24,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              'Il est conseillé de prendre la localisation sur la carte lorsque vous êtes physiquement sur votre lieu de travail.',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppColors.textPrimaryLight,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -806,14 +1382,14 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _currentStep < 2 ? 'Suivant' : 'Créer',
+                        _currentStep < 1 ? 'Suivant' : 'Créer',
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
                           letterSpacing: 0.2,
                         ),
                       ),
-                      if (_currentStep < 2) ...[
+                      if (_currentStep < 1) ...[
                         const SizedBox(width: 8),
                         const Icon(Icons.arrow_forward_ios_rounded, size: 18),
                       ] else ...[
