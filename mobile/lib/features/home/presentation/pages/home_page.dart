@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../auth/auth_controller.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/services/firebase_service.dart';
 
 class HomePage extends StatefulWidget {
   final AuthController authController;
@@ -32,6 +36,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late Animation<double> _fadeAnimation;
   late Animation<double> _glowAnimation;
   late Animation<Color?> _colorAnimation;
+  
+  // Contrôleurs pour le dialogue de modification du PIN
+  final List<TextEditingController> _pinDialogControllers = List.generate(
+    4,
+    (index) => TextEditingController(),
+  );
+  final List<TextEditingController> _confirmPinDialogControllers = List.generate(
+    4,
+    (index) => TextEditingController(),
+  );
+  final List<FocusNode> _pinDialogFocusNodes = List.generate(
+    4,
+    (index) => FocusNode(),
+  );
+  final List<FocusNode> _confirmPinDialogFocusNodes = List.generate(
+    4,
+    (index) => FocusNode(),
+  );
 
   @override
   void initState() {
@@ -67,6 +89,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   void dispose() {
     _animationController.dispose();
+    for (var controller in _pinDialogControllers) {
+      controller.dispose();
+    }
+    for (var controller in _confirmPinDialogControllers) {
+      controller.dispose();
+    }
+    for (var node in _pinDialogFocusNodes) {
+      node.dispose();
+    }
+    for (var node in _confirmPinDialogFocusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -779,7 +813,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 color: AppColors.white.withOpacity(0),
                 child: InkWell(
                   onTap: () {
-                    // TODO: Ouvrir la page annonceur
+                    _handleAnnonceurClick();
                   },
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
                   child: Container(
@@ -1172,6 +1206,1280 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
     );
       },
+    );
+  }
+
+  Future<void> _handleAnnonceurClick() async {
+    try {
+      final user = widget.authController.currentUser;
+      if (user == null) {
+        _showErrorDialog('Vous devez être connecté pour accéder à cette fonctionnalité.');
+        return;
+      }
+
+      // Récupérer les données du profil depuis Firestore
+      final doc = await FirebaseService.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!doc.exists) {
+        _showErrorDialog('Profil utilisateur introuvable.');
+        return;
+      }
+
+      final profileData = doc.data();
+      final pin = profileData?['pin']?.toString() ?? '';
+      final isDefaultPin = profileData?['isDefaultPin'] == true;
+
+      // Vérifier si le PIN est toujours le PIN par défaut
+      final bool isStillDefaultPin = isDefaultPin || pin == '1234';
+
+      if (isStillDefaultPin) {
+        // Afficher le dialogue pour PIN par défaut
+        _showDefaultPinDialog();
+      } else {
+        // Afficher le dialogue pour PIN modifié
+        _showModifiedPinDialog();
+      }
+    } catch (e) {
+      _showErrorDialog('Erreur lors de la vérification: $e');
+    }
+  }
+
+  void _showDefaultPinDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) => AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.white,
+                    AppColors.offWhite,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.warning.withOpacity(0.2 * _glowAnimation.value),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header avec icône animée
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm + 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.warning.withOpacity(0.3 * _glowAnimation.value),
+                                blurRadius: 15,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppColors.warning,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Text(
+                            'Code PIN par défaut',
+                            style: GoogleFonts.inter(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimaryLight,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    // Message principal
+                    Text(
+                      'Vous utilisez encore le code PIN par défaut (1234).',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimaryLight,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    // Carte d'avertissement
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.warning.withOpacity(0.15),
+                            AppColors.warning.withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                        border: Border.all(
+                          color: AppColors.warning.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.warning.withOpacity(0.1 * _glowAnimation.value),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.security,
+                            color: AppColors.warning,
+                            size: 24,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Pour des raisons de sécurité, nous vous recommandons fortement de modifier votre code PIN avant de créer des annonces.',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.warning,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    // Boutons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(
+                                color: AppColors.gray400,
+                                width: 2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                            ),
+                            child: Text(
+                              'Annuler',
+                              style: GoogleFonts.inter(
+                                color: AppColors.gray600,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          flex: 2,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppColors.warning,
+                                  Colors.orange[700]!,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.warning.withOpacity(0.4 * _glowAnimation.value),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _showModifyPinDialog();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.lock_reset, color: AppColors.white, size: 20),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Text(
+                                    'Modifier le PIN',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                      color: AppColors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _getPinDialogValue(List<TextEditingController> controllers) {
+    return controllers.map((e) => e.text).join();
+  }
+
+  void _onPinDialogChanged(int index, String value, List<TextEditingController> controllers, List<FocusNode> focusNodes, {bool isConfirm = false}) {
+    // Use SchedulerBinding to defer focus changes and avoid web pointer binding issues
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      // Move to next field if digit entered
+      if (value.length == 1 && index < 3) {
+        Future.microtask(() {
+          if (mounted && focusNodes[index + 1].canRequestFocus) {
+            focusNodes[index + 1].requestFocus();
+          }
+        });
+      }
+      // Move to previous field if deleted
+      else if (value.isEmpty && index > 0) {
+        Future.microtask(() {
+          if (mounted && focusNodes[index - 1].canRequestFocus) {
+            focusNodes[index - 1].requestFocus();
+          }
+        });
+      }
+    });
+
+    // If all fields filled and this is confirm PIN, validate
+    if (isConfirm && controllers.every((controller) => controller.text.isNotEmpty)) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final pin = _getPinDialogValue(_pinDialogControllers);
+        final confirmPin = _getPinDialogValue(_confirmPinDialogControllers);
+        if (pin != confirmPin && pin.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Les codes PIN ne correspondent pas'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      });
+    }
+  }
+
+  Widget _buildDialogPINField(int index, TextEditingController controller, FocusNode focusNode, {required bool isConfirm}) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        final isFocused = focusNode.hasFocus;
+        return Container(
+          width: 60,
+          height: 72,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+            boxShadow: isFocused
+                ? [
+                    BoxShadow(
+                      color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                          .withOpacity(0.3 * _glowAnimation.value),
+                      blurRadius: 15,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF4CAF50).withOpacity(0.2 * _glowAnimation.value),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: TextField(
+            controller: controller,
+            focusNode: focusNode,
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            maxLength: 1,
+            obscureText: true,
+            obscuringCharacter: '●',
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: GoogleFonts.inter(
+              fontSize: 36,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimaryLight,
+              letterSpacing: 0,
+              height: 1.2,
+            ),
+            decoration: InputDecoration(
+              counterText: '',
+              filled: true,
+              fillColor: AppColors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                borderSide: BorderSide(color: AppColors.gray400, width: 2.5),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                borderSide: BorderSide(color: AppColors.gray400, width: 2.5),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                borderSide: BorderSide(
+                  color: _colorAnimation.value ?? const Color(0xFFFFD700),
+                  width: 3,
+                ),
+              ),
+            ),
+            onChanged: (value) => _onPinDialogChanged(
+              index,
+              value,
+              isConfirm ? _confirmPinDialogControllers : _pinDialogControllers,
+              isConfirm ? _confirmPinDialogFocusNodes : _pinDialogFocusNodes,
+              isConfirm: isConfirm,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _savePinDialog() async {
+    final pin = _getPinDialogValue(_pinDialogControllers);
+    final confirmPin = _getPinDialogValue(_confirmPinDialogControllers);
+
+    if (pin.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le code PIN doit contenir 4 chiffres'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (pin != confirmPin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Les codes PIN ne correspondent pas'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // Vérifier si le PIN est le PIN par défaut
+    if (pin == '1234') {
+      _showDefaultPinRejectedDialog();
+      return;
+    }
+
+    try {
+      final user = widget.authController.currentUser;
+      if (user == null) return;
+
+      await FirebaseService.firestore
+          .collection('users')
+          .doc(user.uid)
+          .update({
+        'pin': pin,
+        'isDefaultPin': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Réinitialiser les champs
+      for (var controller in _pinDialogControllers) {
+        controller.clear();
+      }
+      for (var controller in _confirmPinDialogControllers) {
+        controller.clear();
+      }
+
+      if (mounted) {
+        Navigator.pop(context); // Fermer le dialogue de modification
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Code PIN modifié avec succès'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sauvegarde: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showDefaultPinRejectedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) => AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.white,
+                    AppColors.offWhite,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.warning.withOpacity(0.2 * _glowAnimation.value),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header avec icône animée
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm + 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.warning.withOpacity(0.3 * _glowAnimation.value),
+                                blurRadius: 15,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.block,
+                            color: AppColors.warning,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Text(
+                            'PIN non autorisé',
+                            style: GoogleFonts.inter(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimaryLight,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    // Message principal
+                    Text(
+                      'Le code PIN "1234" est le code par défaut et ne peut pas être utilisé comme nouveau code PIN.',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimaryLight,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    // Carte d'information
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.warning.withOpacity(0.15),
+                            AppColors.warning.withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                        border: Border.all(
+                          color: AppColors.warning.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.warning.withOpacity(0.1 * _glowAnimation.value),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: AppColors.warning,
+                            size: 24,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Pourquoi ?',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                'Pour des raisons de sécurité, vous devez choisir un code PIN différent du code par défaut. Veuillez choisir un code PIN unique et personnel.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.warning,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    // Bouton
+                    SizedBox(
+                      width: double.infinity,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppColors.warning,
+                              Colors.orange[700]!,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.warning.withOpacity(0.4 * _glowAnimation.value),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            // Réinitialiser les champs PIN
+                            for (var controller in _pinDialogControllers) {
+                              controller.clear();
+                            }
+                            for (var controller in _confirmPinDialogControllers) {
+                              controller.clear();
+                            }
+                            // Remettre le focus sur le premier champ
+                            _pinDialogFocusNodes[0].requestFocus();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.refresh, color: AppColors.white, size: 20),
+                              const SizedBox(width: AppSpacing.sm),
+                              Text(
+                                'Réessayer',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  color: AppColors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showModifyPinDialog() {
+    // Réinitialiser les champs
+    for (var controller in _pinDialogControllers) {
+      controller.clear();
+    }
+    for (var controller in _confirmPinDialogControllers) {
+      controller.clear();
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) => AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.white,
+                    AppColors.offWhite,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                        .withOpacity(0.2 * _glowAnimation.value),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.sm + 2),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  _colorAnimation.value ?? const Color(0xFFFFD700),
+                                  const Color(0xFFFF6B35),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                      .withOpacity(0.3 * _glowAnimation.value),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.lock_reset,
+                              color: AppColors.white,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Text(
+                              'Modifier le code PIN',
+                              style: GoogleFonts.inter(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimaryLight,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Nouveau PIN
+                      Text(
+                        'Nouveau code PIN',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: List.generate(
+                          4,
+                          (index) => _buildDialogPINField(
+                            index,
+                            _pinDialogControllers[index],
+                            _pinDialogFocusNodes[index],
+                            isConfirm: false,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Confirmer PIN
+                      Text(
+                        'Confirmer le code PIN',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: List.generate(
+                          4,
+                          (index) => _buildDialogPINField(
+                            index,
+                            _confirmPinDialogControllers[index],
+                            _confirmPinDialogFocusNodes[index],
+                            isConfirm: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Boutons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                // Réinitialiser les champs
+                                for (var controller in _pinDialogControllers) {
+                                  controller.clear();
+                                }
+                                for (var controller in _confirmPinDialogControllers) {
+                                  controller.clear();
+                                }
+                                Navigator.pop(context);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: AppColors.gray400,
+                                  width: 2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                              ),
+                              child: Text(
+                                'Annuler',
+                                style: GoogleFonts.inter(
+                                  color: AppColors.gray600,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            flex: 2,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    _colorAnimation.value ?? const Color(0xFFFFD700),
+                                    const Color(0xFFFF6B35),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                        .withOpacity(0.4 * _glowAnimation.value),
+                                    blurRadius: 15,
+                                    spreadRadius: 2,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _savePinDialog,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.save, color: AppColors.white, size: 20),
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Text(
+                                      'Sauvegarder',
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                        color: AppColors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showModifiedPinDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) => AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.white,
+                    AppColors.offWhite,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.success.withOpacity(0.2 * _glowAnimation.value),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header avec icône animée
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.sm + 2),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                AppColors.success,
+                                const Color(0xFF4CAF50),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.success.withOpacity(0.3 * _glowAnimation.value),
+                                blurRadius: 15,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.check_circle,
+                            color: AppColors.white,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Text(
+                            'Code PIN configuré',
+                            style: GoogleFonts.inter(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimaryLight,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    // Message principal
+                    Text(
+                      'Votre code PIN a été modifié avec succès.',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimaryLight,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    // Carte de confirmation
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.success.withOpacity(0.15),
+                            AppColors.success.withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                        border: Border.all(
+                          color: AppColors.success.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.success.withOpacity(0.1 * _glowAnimation.value),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.security,
+                            color: AppColors.success,
+                            size: 24,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Vous pouvez maintenant créer des annonces en toute sécurité.',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.success,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    // Boutons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(
+                                color: AppColors.gray400,
+                                width: 2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                            ),
+                            child: Text(
+                              'Annuler',
+                              style: GoogleFonts.inter(
+                                color: AppColors.gray600,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          flex: 2,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppColors.success,
+                                  const Color(0xFF4CAF50),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.success.withOpacity(0.4 * _glowAnimation.value),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                // TODO: Ouvrir la page annonceur
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.business, color: AppColors.white, size: 20),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Text(
+                                    'Continuer',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 16,
+                                      color: AppColors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: AppColors.success,
+              size: 28,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                'Code PIN configuré',
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimaryLight,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Votre code PIN a été modifié avec succès.',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondaryLight,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                border: Border.all(
+                  color: AppColors.success.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.security,
+                    color: AppColors.success,
+                    size: 20,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Vous pouvez maintenant créer des annonces en toute sécurité.',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.success,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Annuler',
+              style: GoogleFonts.inter(
+                color: AppColors.gray600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // TODO: Ouvrir la page annonceur
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.sm,
+              ),
+            ),
+            child: Text(
+              'Continuer',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
