@@ -14,6 +14,7 @@ import 'auth/auth_controller.dart';
 import 'auth/ui/welcome_page.dart';
 import 'features/profile/presentation/pages/profile_page.dart';
 import 'features/profile/presentation/pages/create_profile_page.dart';
+import 'features/home/presentation/pages/home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,7 +106,7 @@ class MyApp extends StatelessWidget {
               .findAncestorStateOfType<_AuthWrapperState>();
           final authController =
               authWrapperState?.authController ?? AuthController();
-          return ProfilePage(authController: authController);
+          return HomePage(authController: authController);
         },
         AppRoutes.profile: (context) {
           final authWrapperState = context
@@ -129,6 +130,15 @@ class MyApp extends StatelessWidget {
               },
             );
           case AppRoutes.home:
+            return MaterialPageRoute(
+              builder: (context) {
+                final authWrapperState = context
+                    .findAncestorStateOfType<_AuthWrapperState>();
+                final authController =
+                    authWrapperState?.authController ?? AuthController();
+                return HomePage(authController: authController);
+              },
+            );
           case AppRoutes.profile:
             return MaterialPageRoute(
               builder: (context) {
@@ -177,7 +187,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     // Check if user is authenticated
     if (_authController.currentUser != null) {
       // User is logged in, show home
-      return ProfilePage(authController: _authController);
+      return HomePage(authController: _authController);
     } else {
       // User is not logged in, show welcome
       return WelcomePage(authController: _authController);
