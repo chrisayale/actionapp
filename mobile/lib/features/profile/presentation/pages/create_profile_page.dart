@@ -11,6 +11,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../../../../auth/auth_controller.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/firebase_service.dart';
+import '../../../../core/services/permission_service.dart';
 
 class CreateProfilePage extends StatefulWidget {
   final AuthController authController;
@@ -199,6 +200,60 @@ class _CreateProfilePageState extends State<CreateProfilePage>
     );
 
     if (source != null) {
+      // Vérifier les permissions avant de sélectionner l'image
+      bool hasPermission = false;
+      
+      if (source == ImageSource.camera) {
+        // Vérifier la permission de la caméra
+        hasPermission = await PermissionService.isCameraPermissionGranted();
+        if (!hasPermission) {
+          hasPermission = await PermissionService.requestCameraPermission();
+        }
+      } else if (source == ImageSource.gallery) {
+        // Vérifier la permission de la galerie
+        hasPermission = await PermissionService.isPhotoLibraryPermissionGranted();
+        if (!hasPermission) {
+          hasPermission = await PermissionService.requestPhotoLibraryPermission();
+        }
+      }
+      
+      if (!hasPermission) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      source == ImageSource.camera
+                          ? 'Permission de la caméra requise pour prendre une photo'
+                          : 'Permission de la galerie requise pour sélectionner une image',
+                      style: GoogleFonts.inter(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFFFF9800),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.all(16),
+              action: SnackBarAction(
+                label: 'Paramètres',
+                textColor: Colors.white,
+                onPressed: () async {
+                  await PermissionService.openAppSettings();
+                },
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      
       final XFile? image = await picker.pickImage(
         source: source,
         maxWidth: 600,
@@ -1345,6 +1400,149 @@ class _CreateProfilePageState extends State<CreateProfilePage>
     );
   }
 
+  /// Demande toutes les permissions nécessaires
+  Future<void> _requestAllPermissions() async {
+    try {
+      if (kDebugMode) {
+        print('🔐 Demande des permissions...');
+      }
+
+      // Demander toutes les permissions
+      final results = await PermissionService.requestAllPermissions();
+
+      // Afficher un message de résultat
+      // Utiliser this.context au lieu du context passé en paramètre pour éviter les erreurs
+      if (!mounted) return;
+      
+      final scaffoldMessenger = ScaffoldMessenger.of(this.context);
+      final grantedCount = results.values.where((granted) => granted).length;
+      final totalCount = results.length;
+
+      if (grantedCount == totalCount) {
+        // Toutes les permissions accordées
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Toutes les autorisations ont été accordées',
+                    style: GoogleFonts.inter(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF4CAF50),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+          // Certaines permissions refusées
+          final deniedPermissions = <String>[];
+          if (!results['camera']!) deniedPermissions.add('Caméra');
+          if (!results['photos']!) deniedPermissions.add('Photos');
+          if (!results['notifications']!) deniedPermissions.add('Notifications');
+          if (!results['location']!) deniedPermissions.add('Localisation GPS');
+
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Certaines autorisations ont été refusées',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Refusées: ${deniedPermissions.join(", ")}',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () async {
+                    await PermissionService.openAppSettings();
+                  },
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Ouvrir les paramètres',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 12,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFFFF9800),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur lors de la demande de permissions: $e');
+      }
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Erreur lors de la demande d\'autorisations',
+                  style: GoogleFonts.inter(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+
   void _showPermissionsDialog() {
     showDialog(
       context: context,
@@ -1429,15 +1627,23 @@ class _CreateProfilePageState extends State<CreateProfilePage>
                   description: 'Pour recevoir les mises à jour et promotions',
                   color: const Color(0xFFFF9800),
                 ),
+                const SizedBox(height: 16),
+                _buildPermissionItem(
+                  icon: Icons.location_on,
+                  title: 'Localisation GPS',
+                  description: 'Pour vous proposer des promotions et services à proximité',
+                  color: const Color(0xFF9C27B0),
+                ),
                 const SizedBox(height: 32),
                 // Bouton Accepter
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.of(context).pop();
-                      // TODO: Demander les permissions ici si nécessaire
+                      // Demander les permissions
+                      await _requestAllPermissions();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4CAF50),
@@ -1793,23 +1999,69 @@ class _CreateProfilePageState extends State<CreateProfilePage>
       }
       
       // Mettre à jour le profil dans Firestore avec photoUrl
-      await FirebaseService.firestore
-          .collection('users')
-          .doc(userId)
-          .update({'photoUrl': photoUrl});
+      // Utiliser set avec merge: true pour éviter les conflits de transaction
+      try {
+        await FirebaseService.firestore
+            .collection('users')
+            .doc(userId)
+            .set({'photoUrl': photoUrl}, SetOptions(merge: true));
+        
+        if (kDebugMode) {
+          print('✅ Profil mis à jour avec photoUrl dans Firestore');
+        }
+      } catch (firestoreError) {
+        if (kDebugMode) {
+          print('⚠️ Erreur lors de la mise à jour Firestore: $firestoreError');
+          print('   Type: ${firestoreError.runtimeType}');
+          // Si c'est une erreur de transaction, on peut réessayer une fois
+          if (firestoreError.toString().contains('AbortError') || 
+              firestoreError.toString().contains('transaction')) {
+            if (kDebugMode) {
+              print('   🔄 Nouvelle tentative de mise à jour...');
+            }
+            try {
+              // Attendre un peu avant de réessayer
+              await Future.delayed(const Duration(milliseconds: 500));
+              await FirebaseService.firestore
+                  .collection('users')
+                  .doc(userId)
+                  .set({'photoUrl': photoUrl}, SetOptions(merge: true));
+              if (kDebugMode) {
+                print('✅ Profil mis à jour avec succès après nouvelle tentative');
+              }
+            } catch (retryError) {
+              if (kDebugMode) {
+                print('❌ Échec de la nouvelle tentative: $retryError');
+                print('   💡 La photo est uploadée mais le profil ne sera pas mis à jour automatiquement');
+              }
+            }
+          }
+        }
+      }
       
       // Mettre à jour la photo dans Firebase Auth
-      final user = widget.authController.currentUser;
-      if (user != null) {
-        await user.updatePhotoURL(photoUrl);
+      try {
+        final user = widget.authController.currentUser;
+        if (user != null) {
+          await user.updatePhotoURL(photoUrl);
+          if (kDebugMode) {
+            print('✅ Photo mise à jour dans Firebase Auth');
+          }
+        }
+      } catch (authError) {
+        if (kDebugMode) {
+          print('⚠️ Erreur lors de la mise à jour Auth: $authError');
+        }
+        // Non bloquant, l'utilisateur peut toujours utiliser l'app
       }
       
       if (kDebugMode) {
-        print('✅ Profil mis à jour avec photoUrl');
+        print('✅ Processus d\'upload terminé');
       }
     } catch (e) {
       if (kDebugMode) {
         print('❌ Erreur upload photo en arrière-plan: $e');
+        print('   Type: ${e.runtimeType}');
       }
       // L'erreur est silencieuse car le profil a déjà été créé
     }

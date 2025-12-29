@@ -45,5 +45,23 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Permissions pour la caméra -->
+	<key>NSCameraUsageDescription</key>
+	<string>Cette application a besoin d'accéder à votre caméra pour prendre des photos de profil.</string>
+	<!-- Permissions pour la galerie de photos -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cette application a besoin d'accéder à vos photos pour sélectionner une image de profil.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Cette application a besoin d'accéder à votre galerie pour sauvegarder des images.</string>
+	<!-- Permissions pour les notifications -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<!-- Permissions pour la localisation GPS -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Cette application a besoin d'accéder à votre localisation pour vous proposer des promotions et services à proximité.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Cette application a besoin d'accéder à votre localisation pour vous proposer des promotions et services à proximité.</string>
 </dict>
 </plist>

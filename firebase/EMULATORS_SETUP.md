@@ -24,7 +24,7 @@ firebase emulators:start
 
 Cela démarre tous les emulators configurés dans `firebase.json`:
 - **Auth Emulator**: http://localhost:9099
-- **Firestore Emulator**: http://localhost:8080
+- **Firestore Emulator**: http://localhost:8081
 - **Storage Emulator**: http://localhost:9199
 - **UI Emulator**: http://localhost:4000 (Interface d'administration)
 
@@ -117,7 +117,7 @@ Les ports sont configurés dans `firebase.json`:
       "port": 9099
     },
     "firestore": {
-      "port": 8080
+      "port": 8081
     },
     "storage": {
       "port": 9199
@@ -146,7 +146,7 @@ Future<void> _connectToFirebaseEmulators() async {
       : 'localhost';
       
   await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-  FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
+  FirebaseFirestore.instance.useFirestoreEmulator(host, 8081);
 }
 ```
 

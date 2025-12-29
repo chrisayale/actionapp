@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, defaultTargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kDebugMode, kIsWeb, defaultTargetPlatform;
 import 'package:flutter/services.dart' show TargetPlatform;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -16,15 +17,13 @@ import 'features/profile/presentation/pages/create_profile_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   // Connecter aux emulators Firebase en mode debug/local
   if (kDebugMode) {
     await _connectToFirebaseEmulators();
   }
-  
+
   runApp(const MyApp());
 }
 
@@ -35,29 +34,33 @@ Future<void> _connectToFirebaseEmulators() async {
     // Pour Android Emulator, utiliser 10.0.2.2 au lieu de localhost
     // Pour les autres plateformes (iOS, Web, Desktop), utiliser localhost
     String host = 'localhost';
-    
+
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       host = '10.0.2.2'; // Adresse spéciale pour Android Emulator
     }
-    
+
     // Connecter Auth Emulator
     await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-    
+
     // Connecter Firestore Emulator
-    FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-    
+    FirebaseFirestore.instance.useFirestoreEmulator(host, 8081);
+
     // Connecter Storage Emulator
     FirebaseStorage.instance.useStorageEmulator(host, 9199);
-    
+
     if (kDebugMode) {
       print('✅ Connecté aux emulators Firebase locaux');
       print('   - Host: $host');
       print('   - Auth: $host:9099');
-      print('   - Firestore: $host:8080');
+      print('   - Firestore: $host:8081');
       print('   - Storage: $host:9199');
       print('');
-      print('⚠️  Note: Les emulators Storage peuvent être très lents en développement.');
-      print('   Les uploads peuvent prendre plusieurs minutes même pour de petits fichiers.');
+      print(
+        '⚠️  Note: Les emulators Storage peuvent être très lents en développement.',
+      );
+      print(
+        '   Les uploads peuvent prendre plusieurs minutes même pour de petits fichiers.',
+      );
       print('   En production, les uploads seront beaucoup plus rapides.');
     }
   } catch (e) {
@@ -85,27 +88,30 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('fr', 'FR'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('fr', 'FR'), Locale('en', 'US')],
       locale: const Locale('fr', 'FR'),
       home: const AuthWrapper(),
       routes: {
         AppRoutes.createProfile: (context) {
-          final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
-          final authController = authWrapperState?.authController ?? AuthController();
+          final authWrapperState = context
+              .findAncestorStateOfType<_AuthWrapperState>();
+          final authController =
+              authWrapperState?.authController ?? AuthController();
           return CreateProfilePage(authController: authController);
         },
         AppRoutes.home: (context) {
           // Try to get authController from AuthWrapper, otherwise create new one
-          final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
-          final authController = authWrapperState?.authController ?? AuthController();
+          final authWrapperState = context
+              .findAncestorStateOfType<_AuthWrapperState>();
+          final authController =
+              authWrapperState?.authController ?? AuthController();
           return ProfilePage(authController: authController);
         },
         AppRoutes.profile: (context) {
-          final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
-          final authController = authWrapperState?.authController ?? AuthController();
+          final authWrapperState = context
+              .findAncestorStateOfType<_AuthWrapperState>();
+          final authController =
+              authWrapperState?.authController ?? AuthController();
           return ProfilePage(authController: authController);
         },
       },
@@ -115,8 +121,10 @@ class MyApp extends StatelessWidget {
           case AppRoutes.createProfile:
             return MaterialPageRoute(
               builder: (context) {
-                final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
-                final authController = authWrapperState?.authController ?? AuthController();
+                final authWrapperState = context
+                    .findAncestorStateOfType<_AuthWrapperState>();
+                final authController =
+                    authWrapperState?.authController ?? AuthController();
                 return CreateProfilePage(authController: authController);
               },
             );
@@ -124,8 +132,10 @@ class MyApp extends StatelessWidget {
           case AppRoutes.profile:
             return MaterialPageRoute(
               builder: (context) {
-                final authWrapperState = context.findAncestorStateOfType<_AuthWrapperState>();
-                final authController = authWrapperState?.authController ?? AuthController();
+                final authWrapperState = context
+                    .findAncestorStateOfType<_AuthWrapperState>();
+                final authController =
+                    authWrapperState?.authController ?? AuthController();
                 return ProfilePage(authController: authController);
               },
             );
@@ -147,7 +157,7 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   final AuthController _authController = AuthController();
-  
+
   // Expose authController for access from routes
   AuthController get authController => _authController;
 
@@ -174,4 +184,3 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
   }
 }
-

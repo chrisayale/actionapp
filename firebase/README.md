@@ -40,7 +40,7 @@ firebase emulators:start
 
 ### Ports des emulators:
 - **Auth**: http://localhost:9099
-- **Firestore**: http://localhost:8080
+- **Firestore**: http://localhost:8081
 - **Storage**: http://localhost:9199
 - **UI**: http://localhost:4000 (Interface d'administration)
 
