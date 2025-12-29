@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../auth/auth_controller.dart';
+import '../../../../core/routes/app_routes.dart';
 
 class HomePage extends StatefulWidget {
   final AuthController authController;
@@ -120,22 +121,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         child: Row(
           children: [
-            // Menu hamburger avec effet
+            // Icône de profil avec effet
             Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: () {
-                  // TODO: Ouvrir le menu drawer
+                  Navigator.pushNamed(context, AppRoutes.profile);
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.all(8),
-                  child: const Icon(Icons.menu, color: Colors.black87, size: 24),
+                  child: const Icon(Icons.person, color: Colors.black87, size: 24),
                 ),
               ),
             ),
             const SizedBox(width: 8),
-            // Logo et nom avec Card
+            // Logo de l'application avec Card
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -145,20 +146,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white,
-                      Colors.grey[100]!,
-                    ],
-                  ),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.water_drop,
-                  color: Color(0xFFFFD700),
-                  size: 24,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/images/Logo.png',
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
