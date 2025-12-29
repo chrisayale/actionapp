@@ -1,7 +1,16 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../../../../auth/auth_controller.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/services/firebase_service.dart';
 
 class ProfilePage extends StatefulWidget {
   final AuthController authController;
@@ -20,6 +29,35 @@ class _ProfilePageState extends State<ProfilePage>
   late AnimationController _animationController;
   late Animation<double> _glowAnimation;
   late Animation<Color?> _colorAnimation;
+  
+  Map<String, dynamic>? _profileData;
+  bool _isLoading = true;
+  bool _isEditing = false;
+  bool _isSaving = false;
+  
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final List<TextEditingController> _pinControllers = List.generate(
+    4,
+    (index) => TextEditingController(),
+  );
+  final List<TextEditingController> _confirmPinControllers = List.generate(
+    4,
+    (index) => TextEditingController(),
+  );
+  final List<FocusNode> _pinFocusNodes = List.generate(
+    4,
+    (index) => FocusNode(),
+  );
+  final List<FocusNode> _confirmPinFocusNodes = List.generate(
+    4,
+    (index) => FocusNode(),
+  );
+  String? _selectedGender;
+  DateTime? _selectedDateOfBirth;
+  Uint8List? _selectedImageBytes;
+  String? _currentPhotoUrl;
+  bool _hasPin = false;
 
   @override
   void initState() {
@@ -39,34 +77,312 @@ class _ProfilePageState extends State<ProfilePage>
     );
 
     _colorAnimation = ColorTween(
-      begin: const Color(0xFF4CAF50),
-      end: const Color(0xFF2196F3),
+      begin: const Color(0xFFFFD700),
+      end: const Color(0xFFFF6B35),
     ).animate(_animationController);
+
+    _loadProfileData();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _nameController.dispose();
+    for (var controller in _pinControllers) {
+      controller.dispose();
+    }
+    for (var controller in _confirmPinControllers) {
+      controller.dispose();
+    }
+    for (var node in _pinFocusNodes) {
+      node.dispose();
+    }
+    for (var node in _confirmPinFocusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _handleLogout() async {
+  Future<void> _loadProfileData() async {
+    try {
+      final user = widget.authController.currentUser;
+      if (user == null) return;
+
+      final doc = await FirebaseService.firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists) {
+        setState(() {
+          _profileData = doc.data();
+          _nameController.text = _profileData?['displayName'] ?? '';
+          _selectedGender = _profileData?['gender'];
+          _currentPhotoUrl = _profileData?['photoUrl'] ?? user.photoURL;
+          _hasPin = _profileData?['pin'] != null && _profileData!['pin'].toString().isNotEmpty;
+          
+          if (_profileData?['dateOfBirth'] != null) {
+            final timestamp = _profileData!['dateOfBirth'];
+            if (timestamp is Timestamp) {
+              _selectedDateOfBirth = timestamp.toDate();
+            }
+          }
+          
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors du chargement: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        final Uint8List? compressed = await FlutterImageCompress.compressWithFile(
+          image.path,
+          minWidth: 800,
+          minHeight: 800,
+          quality: 85,
+        );
+
+        if (compressed != null) {
+          setState(() {
+            _selectedImageBytes = compressed;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sélection: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _uploadPhoto(String userId, Uint8List imageBytes) async {
+    try {
+      final ref = FirebaseService.storage
+          .ref()
+          .child('profile_photos')
+          .child('$userId.jpg');
+
+      await ref.putData(imageBytes);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'upload: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
+  String _getPinValue(List<TextEditingController> controllers) {
+    return controllers.map((e) => e.text).join();
+  }
+
+  void _onPinChanged(int index, String value, List<TextEditingController> controllers, List<FocusNode> focusNodes, {bool isConfirm = false}) {
+    // Use SchedulerBinding to defer focus changes and avoid web pointer binding issues
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      // Move to next field if digit entered
+      if (value.length == 1 && index < 3) {
+        Future.microtask(() {
+          if (mounted && focusNodes[index + 1].canRequestFocus) {
+            focusNodes[index + 1].requestFocus();
+          }
+        });
+      }
+      // Move to previous field if deleted
+      else if (value.isEmpty && index > 0) {
+        Future.microtask(() {
+          if (mounted && focusNodes[index - 1].canRequestFocus) {
+            focusNodes[index - 1].requestFocus();
+          }
+        });
+      }
+    });
+
+    // If all fields filled and this is confirm PIN, validate
+    if (isConfirm && controllers.every((controller) => controller.text.isNotEmpty)) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final pin = _getPinValue(_pinControllers);
+        final confirmPin = _getPinValue(_confirmPinControllers);
+        if (pin != confirmPin && pin.isNotEmpty) {
+          // Show error if PINs don't match
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Les codes PIN ne correspondent pas'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      });
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    // Vérifier le PIN si fourni
+    final pin = _getPinValue(_pinControllers);
+    final confirmPin = _getPinValue(_confirmPinControllers);
+    
+    if (pin.isNotEmpty || confirmPin.isNotEmpty) {
+      if (pin.length != 4) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Le code PIN doit contenir 4 chiffres'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+      if (pin != confirmPin) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Les codes PIN ne correspondent pas'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final user = widget.authController.currentUser;
+      if (user == null) return;
+
+      final Map<String, dynamic> updateData = {
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (_nameController.text.trim().isNotEmpty) {
+        updateData['displayName'] = _nameController.text.trim();
+        await user.updateDisplayName(_nameController.text.trim());
+      }
+
+      if (_selectedGender != null) {
+        updateData['gender'] = _selectedGender;
+      }
+
+      if (_selectedDateOfBirth != null) {
+        updateData['dateOfBirth'] = Timestamp.fromDate(_selectedDateOfBirth!);
+      }
+
+      // Ajouter le PIN si fourni (sera hashé côté backend)
+      if (pin.isNotEmpty) {
+        updateData['pin'] = pin; // TODO: Hasher le PIN côté backend pour plus de sécurité
+      }
+
+      String? photoUrl = _currentPhotoUrl;
+      if (_selectedImageBytes != null) {
+        photoUrl = await _uploadPhoto(user.uid, _selectedImageBytes!);
+        if (photoUrl != null) {
+          updateData['photoUrl'] = photoUrl;
+          await user.updatePhotoURL(photoUrl);
+        }
+      }
+
+      await FirebaseService.firestore
+          .collection('users')
+          .doc(user.uid)
+          .update(updateData);
+
+      await _loadProfileData();
+
+      setState(() {
+        _isEditing = false;
+        _isSaving = false;
+        _selectedImageBytes = null;
+        // Réinitialiser les champs PIN
+        for (var controller in _pinControllers) {
+          controller.clear();
+        }
+        for (var controller in _confirmPinControllers) {
+          controller.clear();
+        }
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profil mis à jour avec succès'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isSaving = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sauvegarde: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteAccount() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+        ),
         title: Text(
-          'Déconnexion',
+          'Supprimer le compte',
           style: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            fontWeight: FontWeight.w700,
+            color: AppColors.error,
           ),
         ),
         content: Text(
-          'Êtes-vous sûr de vouloir vous déconnecter ?',
-          style: GoogleFonts.inter(color: Colors.grey[700]),
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          'Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.',
+          style: GoogleFonts.inter(color: AppColors.textSecondaryLight),
         ),
         actions: [
           TextButton(
@@ -74,7 +390,92 @@ class _ProfilePageState extends State<ProfilePage>
             child: Text(
               'Annuler',
               style: GoogleFonts.inter(
-                color: Colors.grey[600],
+                color: AppColors.gray600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Supprimer',
+              style: GoogleFonts.inter(
+                color: AppColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      try {
+        final user = widget.authController.currentUser;
+        if (user == null) return;
+
+        // Supprimer les données Firestore
+        await FirebaseService.firestore
+            .collection('users')
+            .doc(user.uid)
+            .delete();
+
+        // Supprimer la photo de profil du Storage
+        if (_currentPhotoUrl != null) {
+          try {
+            final ref = FirebaseService.storage
+                .ref()
+                .child('profile_photos')
+                .child('${user.uid}.jpg');
+            await ref.delete();
+          } catch (e) {
+            // Ignorer l'erreur si le fichier n'existe pas
+          }
+        }
+
+        // Supprimer le compte Firebase Auth
+        await user.delete();
+
+        // Déconnexion
+        await widget.authController.signOut();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de la suppression: $e'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+        ),
+        title: Text(
+          'Déconnexion',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimaryLight,
+          ),
+        ),
+        content: Text(
+          'Êtes-vous sûr de vouloir vous déconnecter ?',
+          style: GoogleFonts.inter(color: AppColors.textSecondaryLight),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Annuler',
+              style: GoogleFonts.inter(
+                color: AppColors.gray600,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -84,7 +485,7 @@ class _ProfilePageState extends State<ProfilePage>
             child: Text(
               'Déconnexion',
               style: GoogleFonts.inter(
-                color: Colors.red[600],
+                color: AppColors.error,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -95,37 +496,41 @@ class _ProfilePageState extends State<ProfilePage>
 
     if (confirm == true && mounted) {
       await widget.authController.signOut();
-      // La navigation sera gérée automatiquement par AuthWrapper qui écoute les changements d'état
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = widget.authController.currentUser;
-    final size = MediaQuery.of(context).size;
-    final padding = size.width * 0.08;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.backgroundLight,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: padding),
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              // Header avec avatar
-              _buildProfileHeader(user),
-              const SizedBox(height: 32),
-              // Informations utilisateur
-              _buildUserInfoCard(user),
-              const SizedBox(height: 24),
-              // Menu options
-              _buildMenuOptions(),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.screenHorizontal,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: AppSpacing.md),
+                      // Header avec avatar
+                      _buildProfileHeader(user),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Informations utilisateur
+                      _buildUserInfoCard(user),
+                      const SizedBox(height: AppSpacing.lg),
+                      // Boutons d'action
+                      _buildActionButtons(),
+                      const SizedBox(height: AppSpacing.xl),
+                    ],
+                  ),
+                ),
+              ),
       ),
     );
   }
@@ -137,77 +542,121 @@ class _ProfilePageState extends State<ProfilePage>
         return Column(
           children: [
             // Avatar avec glow animé
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: _colorAnimation.value ?? const Color(0xFF4CAF50),
-                  width: 4,
+            GestureDetector(
+              onTap: _isEditing ? _pickImage : null,
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _colorAnimation.value ?? const Color(0xFFFFD700),
+                    width: 4,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                          .withOpacity(_glowAnimation.value),
+                      blurRadius: 40,
+                      spreadRadius: 8,
+                      offset: const Offset(0, 0),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF4CAF50).withOpacity(_glowAnimation.value * 0.5),
+                      blurRadius: 35,
+                      spreadRadius: 6,
+                      offset: const Offset(0, 0),
+                    ),
+                    BoxShadow(
+                      color: AppColors.black.withOpacity(0.15),
+                      blurRadius: 24,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: (_colorAnimation.value ?? const Color(0xFF4CAF50))
-                        .withOpacity(_glowAnimation.value),
-                    blurRadius: 30,
-                    spreadRadius: 4,
-                    offset: const Offset(0, 0),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 24,
-                    spreadRadius: 2,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: CircleAvatar(
-                radius: 58,
-                backgroundColor: Colors.grey[200],
-                child: user?.photoURL != null
-                    ? ClipOval(
-                        child: Image.network(
-                          user!.photoURL!,
-                          fit: BoxFit.cover,
-                          width: 116,
-                          height: 116,
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 68,
+                      backgroundColor: AppColors.gray100,
+                      backgroundImage: _selectedImageBytes != null
+                          ? MemoryImage(_selectedImageBytes!)
+                          : (_currentPhotoUrl != null
+                              ? NetworkImage(_currentPhotoUrl!)
+                              : null) as ImageProvider?,
+                      child: _selectedImageBytes == null && _currentPhotoUrl == null
+                          ? Icon(
+                              Icons.person,
+                              size: 70,
+                              color: _colorAnimation.value ?? const Color(0xFFFFD700),
+                            )
+                          : null,
+                    ),
+                    if (_isEditing)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2196F3),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.white,
+                              width: 3,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: AppColors.white,
+                            size: 20,
+                          ),
                         ),
-                      )
-                    : Icon(
-                        Icons.person,
-                        size: 60,
-                        color: _colorAnimation.value ?? const Color(0xFF4CAF50),
                       ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.lg),
             // Nom utilisateur avec gradient
             ShaderMask(
               shaderCallback: (bounds) => LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
+                  const Color(0xFFFFD700),
+                  const Color(0xFFFF6B35),
                   const Color(0xFF4CAF50),
                   const Color(0xFF2196F3),
-                  const Color(0xFFFFD700),
                 ],
                 stops: [
                   0.0,
-                  0.5 + (0.1 * _glowAnimation.value),
+                  0.33 + (0.1 * _glowAnimation.value),
+                  0.66 + (0.1 * _glowAnimation.value),
                   1.0,
                 ],
               ).createShader(bounds),
               child: Text(
-                user?.displayName ?? 
-                user?.phoneNumber?.replaceRange(0, 4, '****') ?? 
-                'Utilisateur',
+                _isEditing
+                    ? 'Modifier le profil'
+                    : (user?.displayName ??
+                        _profileData?['displayName'] ??
+                        user?.phoneNumber?.replaceRange(0, 4, '****') ??
+                        'Utilisateur'),
                 style: GoogleFonts.inter(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  color: AppColors.white,
                   letterSpacing: -0.5,
                   height: 1.2,
+                  shadows: [
+                    Shadow(
+                      color: const Color(0xFFFFD700).withOpacity(0.5 * _glowAnimation.value),
+                      blurRadius: 15,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -226,13 +675,13 @@ class _ProfilePageState extends State<ProfilePage>
           elevation: 12,
           shadowColor: const Color(0xFF4CAF50).withOpacity(0.2),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
           ),
           child: Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              color: Colors.white,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+              color: AppColors.white,
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFF2196F3).withOpacity(0.1 * _glowAnimation.value),
@@ -244,26 +693,87 @@ class _ProfilePageState extends State<ProfilePage>
             ),
             child: Column(
               children: [
-                _buildInfoRow(
-                  icon: Icons.phone,
-                  label: 'Téléphone',
-                  value: user?.phoneNumber ?? 'Non renseigné',
-                  color: const Color(0xFF4CAF50),
-                ),
-                const Divider(height: 32),
-                _buildInfoRow(
-                  icon: Icons.email,
-                  label: 'Email',
-                  value: user?.email ?? 'Non renseigné',
-                  color: const Color(0xFF2196F3),
-                ),
-                if (user?.emailVerified == true) ...[
-                  const Divider(height: 32),
+                if (_isEditing) ...[
+                  _buildEditableField(
+                    label: 'Nom complet',
+                    controller: _nameController,
+                    icon: Icons.person,
+                    color: const Color(0xFF2196F3),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildGenderSelector(),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildDateOfBirthSelector(),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildPINFields(
+                    label: _hasPin ? 'Nouveau code PIN (optionnel)' : 'Code PIN (optionnel)',
+                    controllers: _pinControllers,
+                    focusNodes: _pinFocusNodes,
+                    isConfirm: false,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildPINInfoCard(),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildPINFields(
+                    label: 'Confirmer le code PIN',
+                    controllers: _confirmPinControllers,
+                    focusNodes: _confirmPinFocusNodes,
+                    isConfirm: true,
+                  ),
+                ] else ...[
                   _buildInfoRow(
-                    icon: Icons.verified,
-                    label: 'Statut',
-                    value: 'Compte vérifié',
+                    icon: Icons.person,
+                    label: 'Nom',
+                    value: user?.displayName ??
+                        _profileData?['displayName'] ??
+                        'Non renseigné',
+                    color: const Color(0xFF2196F3),
+                  ),
+                  if (_profileData?['gender'] != null) ...[
+                    const Divider(height: AppSpacing.xl),
+                    _buildInfoRow(
+                      icon: _profileData!['gender'] == 'M'
+                          ? Icons.male
+                          : Icons.female,
+                      label: 'Genre',
+                      value: _profileData!['gender'] == 'M' ? 'Homme' : 'Femme',
+                      color: const Color(0xFFFF6B35),
+                    ),
+                  ],
+                  if (_selectedDateOfBirth != null || _profileData?['dateOfBirth'] != null) ...[
+                    const Divider(height: AppSpacing.xl),
+                    _buildInfoRow(
+                      icon: Icons.calendar_today,
+                      label: 'Date de naissance',
+                      value: _formatDate(_selectedDateOfBirth ??
+                          (_profileData?['dateOfBirth'] is Timestamp
+                              ? (_profileData!['dateOfBirth'] as Timestamp).toDate()
+                              : null)),
+                      color: const Color(0xFF4CAF50),
+                    ),
+                  ],
+                  const Divider(height: AppSpacing.xl),
+                  _buildInfoRow(
+                    icon: Icons.phone,
+                    label: 'Téléphone',
+                    value: user?.phoneNumber ?? 'Non renseigné',
                     color: const Color(0xFF4CAF50),
+                  ),
+                  if (user?.email != null) ...[
+                    const Divider(height: AppSpacing.xl),
+                    _buildInfoRow(
+                      icon: Icons.email,
+                      label: 'Email',
+                      value: user!.email!,
+                      color: const Color(0xFF2196F3),
+                    ),
+                  ],
+                  const Divider(height: AppSpacing.xl),
+                  _buildInfoRow(
+                    icon: Icons.lock,
+                    label: 'Code PIN',
+                    value: _hasPin ? 'Défini' : 'Non défini',
+                    color: _hasPin ? const Color(0xFF4CAF50) : AppColors.warning,
                   ),
                 ],
               ],
@@ -271,6 +781,210 @@ class _ProfilePageState extends State<ProfilePage>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEditableField({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondaryLight,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        TextFormField(
+          controller: controller,
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, color: color),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+              borderSide: BorderSide(color: AppColors.borderLight),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+              borderSide: BorderSide(color: AppColors.borderLight),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+              borderSide: BorderSide(color: color, width: 2),
+            ),
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Ce champ est requis';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Genre',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondaryLight,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: _buildGenderOption('M', 'Homme', Icons.male),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _buildGenderOption('F', 'Femme', Icons.female),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenderOption(String value, String label, IconData icon) {
+    final isSelected = _selectedGender == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedGender = value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.md,
+          horizontal: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFFF6B35).withOpacity(0.1)
+              : AppColors.gray50,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFFF6B35)
+                : AppColors.borderLight,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isSelected
+                  ? const Color(0xFFFF6B35)
+                  : AppColors.gray500,
+              size: 20,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? const Color(0xFFFF6B35)
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateOfBirthSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Date de naissance',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondaryLight,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        GestureDetector(
+          onTap: () async {
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: _selectedDateOfBirth ?? DateTime.now().subtract(const Duration(days: 365 * 20)),
+              firstDate: DateTime(1950),
+              lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: ColorScheme.light(
+                      primary: const Color(0xFFFFD700),
+                      onPrimary: AppColors.white,
+                      surface: AppColors.white,
+                      onSurface: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) {
+              setState(() {
+                _selectedDateOfBirth = picked;
+              });
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+              border: Border.all(color: AppColors.borderLight),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  color: const Color(0xFF4CAF50),
+                  size: 20,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Text(
+                  _formatDate(_selectedDateOfBirth),
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: _selectedDateOfBirth != null
+                        ? AppColors.textPrimaryLight
+                        : AppColors.textTertiaryLight,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.gray500,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -286,7 +1000,7 @@ class _ProfilePageState extends State<ProfilePage>
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
           ),
           child: Icon(
             icon,
@@ -294,7 +1008,7 @@ class _ProfilePageState extends State<ProfilePage>
             size: 24,
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -304,7 +1018,7 @@ class _ProfilePageState extends State<ProfilePage>
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Colors.grey[600],
+                  color: AppColors.textTertiaryLight,
                 ),
               ),
               const SizedBox(height: 4),
@@ -313,7 +1027,7 @@ class _ProfilePageState extends State<ProfilePage>
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: AppColors.textPrimaryLight,
                 ),
               ),
             ],
@@ -323,209 +1037,437 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  Widget _buildMenuOptions() {
+  Widget _buildActionButtons() {
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
         return Column(
           children: [
-            _buildMenuCard(
-              icon: Icons.edit,
-              title: 'Modifier le profil',
-              subtitle: 'Changer vos informations',
-              color: const Color(0xFF2196F3),
-              onTap: () {
-                // TODO: Naviguer vers la page d'édition
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fonctionnalité à venir'),
-                    behavior: SnackBarBehavior.floating,
+            if (_isEditing) ...[
+              // Bouton Sauvegarder
+              SizedBox(
+                width: double.infinity,
+                height: 58,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        _colorAnimation.value ?? const Color(0xFFFFD700),
+                        const Color(0xFFFF6B35),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                            .withOpacity(_glowAnimation.value),
+                        blurRadius: 20,
+                        spreadRadius: 4,
+                        offset: const Offset(0, 6),
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFF4CAF50).withOpacity(_glowAnimation.value * 0.5),
+                        blurRadius: 15,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildMenuCard(
-              icon: Icons.settings,
-              title: 'Paramètres',
-              subtitle: 'Préférences et configuration',
-              color: Colors.grey[700]!,
-              onTap: () {
-                // TODO: Naviguer vers les paramètres
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fonctionnalité à venir'),
-                    behavior: SnackBarBehavior.floating,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _saveProfile,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                      ),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.save, color: AppColors.white, size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Sauvegarder',
+                                style: GoogleFonts.inter(
+                                  color: AppColors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildMenuCard(
-              icon: Icons.help_outline,
-              title: 'Aide et support',
-              subtitle: 'FAQ et contact',
-              color: const Color(0xFFFF9800),
-              onTap: () {
-                // TODO: Naviguer vers l'aide
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fonctionnalité à venir'),
-                    behavior: SnackBarBehavior.floating,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              // Bouton Annuler
+              SizedBox(
+                width: double.infinity,
+                height: 58,
+                child: OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isEditing = false;
+                      _selectedImageBytes = null;
+                      // Réinitialiser les champs PIN
+                      for (var controller in _pinControllers) {
+                        controller.clear();
+                      }
+                      for (var controller in _confirmPinControllers) {
+                        controller.clear();
+                      }
+                      _loadProfileData();
+                    });
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.gray400, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                    ),
                   ),
-                );
-              },
-            ),
-            const SizedBox(height: 32),
-            // Bouton de déconnexion
-            _buildLogoutButton(),
+                  child: Text(
+                    'Annuler',
+                    style: GoogleFonts.inter(
+                      color: AppColors.gray600,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ] else ...[
+              // Bouton Modifier
+              SizedBox(
+                width: double.infinity,
+                height: 58,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF2196F3),
+                        const Color(0xFF4CAF50),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2196F3).withOpacity(0.3 * _glowAnimation.value),
+                        blurRadius: 20,
+                        spreadRadius: 4,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _isEditing = true;
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.edit, color: AppColors.white, size: 20),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Modifier le profil',
+                          style: GoogleFonts.inter(
+                            color: AppColors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              // Bouton Supprimer le compte
+              SizedBox(
+                width: double.infinity,
+                height: 58,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.error,
+                        Colors.red[700]!,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.error.withOpacity(0.4 * _glowAnimation.value),
+                        blurRadius: 20,
+                        spreadRadius: 4,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    onPressed: _deleteAccount,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.delete_forever, color: AppColors.white, size: 20),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Supprimer le compte',
+                          style: GoogleFonts.inter(
+                            color: AppColors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              // Bouton Déconnexion
+              SizedBox(
+                width: double.infinity,
+                height: 58,
+                child: OutlinedButton(
+                  onPressed: _handleLogout,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.gray400, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.logout, color: AppColors.gray600, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Déconnexion',
+                        style: GoogleFonts.inter(
+                          color: AppColors.gray600,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
         );
       },
     );
   }
 
-  Widget _buildMenuCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Sélectionner une date';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Widget _buildPINFields({
+    required String label,
+    required List<TextEditingController> controllers,
+    required List<FocusNode> focusNodes,
+    required bool isConfirm,
   }) {
-    return Card(
-      elevation: 6,
-      shadowColor: color.withOpacity(0.2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: Colors.white,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right,
-                  color: Colors.grey[400],
-                  size: 24,
-                ),
-              ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondaryLight,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(
+            4,
+            (index) => _buildPINField(
+              index,
+              controllers[index],
+              focusNodes[index],
+              isConfirm: isConfirm,
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildLogoutButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 58,
-      child: Card(
-        elevation: 8,
-        shadowColor: Colors.red.withOpacity(0.3),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Container(
+  Widget _buildPINField(
+    int index,
+    TextEditingController controller,
+    FocusNode focusNode, {
+    required bool isConfirm,
+  }) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        final isFocused = focusNode.hasFocus;
+        return Container(
+          width: 60,
+          height: 72,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.red[400]!,
-                Colors.red[600]!,
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.red.withOpacity(0.4 * _glowAnimation.value),
-                blurRadius: 20,
-                spreadRadius: 4,
-                offset: const Offset(0, 6),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+            boxShadow: isFocused
+                ? [
+                    BoxShadow(
+                      color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                          .withOpacity(0.3 * _glowAnimation.value),
+                      blurRadius: 15,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF4CAF50).withOpacity(0.2 * _glowAnimation.value),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _handleLogout,
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.logout,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Déconnexion',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+          child: TextField(
+            controller: controller,
+            focusNode: focusNode,
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            maxLength: 1,
+            obscureText: true,
+            obscuringCharacter: '●',
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+            ],
+            style: GoogleFonts.inter(
+              fontSize: 36,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimaryLight,
+              letterSpacing: 0,
+              height: 1.2,
+            ),
+            decoration: InputDecoration(
+              counterText: '',
+              filled: true,
+              fillColor: AppColors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                borderSide: BorderSide(
+                  color: AppColors.gray400,
+                  width: 2.5,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                borderSide: BorderSide(
+                  color: AppColors.gray400,
+                  width: 2.5,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                borderSide: BorderSide(
+                  color: _colorAnimation.value ?? const Color(0xFFFFD700),
+                  width: 3,
                 ),
               ),
             ),
+            onChanged: (value) => _onPinChanged(
+              index,
+              value,
+              isConfirm ? _confirmPinControllers : _pinControllers,
+              isConfirm ? _confirmPinFocusNodes : _pinFocusNodes,
+              isConfirm: isConfirm,
+            ),
           ),
-        ),
-      ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPINInfoCard() {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Card(
+          elevation: 4,
+          shadowColor: AppColors.warning.withOpacity(0.2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+              color: AppColors.warning.withOpacity(0.1),
+              border: Border.all(
+                color: AppColors.warning.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: AppColors.warning,
+                  size: 24,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'Le code PIN est indispensable si vous souhaitez publier des promotions',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.warning,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
