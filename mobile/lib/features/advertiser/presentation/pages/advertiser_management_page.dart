@@ -4,6 +4,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../auth/auth_controller.dart';
 import 'create_advertiser_page.dart';
+import '../../data/models/establishment_model.dart';
+import '../../data/repositories/advertiser_repository.dart';
 
 /// Screen for managing advertiser establishments
 /// Displays a list of establishments with actions: Manage, Edit, Toggle Status, Delete
@@ -20,39 +22,36 @@ class AdvertiserManagementPage extends StatefulWidget {
 }
 
 class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
-  // Mock data for establishments
-  List<Establishment> _establishments = [
-    Establishment(
-      id: '1',
-      name: 'RDC BAR',
-      location: 'KAVA/GOMBE, Kinshasa',
-      isActive: true,
-    ),
-    Establishment(
-      id: '2',
-      name: 'Bistro Le Soleil d\'Or',
-      location: 'GOMBE, Kinshasa',
-      isActive: true,
-    ),
-    Establishment(
-      id: '3',
-      name: 'Café Central',
-      location: 'LINGWALA, Kinshasa',
-      isActive: false,
-    ),
-    Establishment(
-      id: '4',
-      name: 'Restaurant La Terrasse',
-      location: 'GOMBE, Kinshasa',
-      isActive: true,
-    ),
-    Establishment(
-      id: '5',
-      name: 'Night Club VIP',
-      location: 'MAKALA, Kinshasa',
-      isActive: false,
-    ),
-  ];
+  final AdvertiserRepository _repository = AdvertiserRepository();
+  List<EstablishmentModel> _establishments = [];
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEstablishments();
+  }
+
+  Future<void> _loadEstablishments() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final establishments = await _repository.getEstablishments();
+      setState(() {
+        _establishments = establishments;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +106,59 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
   }
 
   Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.yellowPrimary),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: AppColors.error,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                'Erreur',
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimaryLight,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              ElevatedButton(
+                onPressed: _loadEstablishments,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.yellowPrimary,
+                  foregroundColor: AppColors.textPrimaryLight,
+                ),
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_establishments.isEmpty) {
       return _buildEmptyState();
     }
@@ -200,9 +252,7 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
   }
 
   Future<void> _refreshEstablishments() async {
-    // Simulate refresh
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {});
+    await _loadEstablishments();
   }
 
   void _handleCreateAdvertiser() {
@@ -221,7 +271,7 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
     });
   }
 
-  void _handleManage(Establishment establishment) {
+  void _handleManage(EstablishmentModel establishment) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -246,7 +296,7 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
     // TODO: Navigate to management screen
   }
 
-  void _handleEdit(Establishment establishment) {
+  void _handleEdit(EstablishmentModel establishment) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -271,49 +321,72 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
     // TODO: Navigate to edit screen
   }
 
-  void _handleToggleStatus(Establishment establishment) {
-    setState(() {
-      final index = _establishments.indexWhere((e) => e.id == establishment.id);
-      if (index != -1) {
-        _establishments[index] = Establishment(
-          id: establishment.id,
-          name: establishment.name,
-          location: establishment.location,
-          isActive: !establishment.isActive,
+  Future<void> _handleToggleStatus(EstablishmentModel establishment) async {
+    try {
+      await _repository.updateEstablishment(
+        id: establishment.id,
+        isActive: !establishment.isActive,
+      );
+
+      await _loadEstablishments();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  establishment.isActive ? Icons.check_circle : Icons.pause_circle,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    establishment.isActive
+                        ? '${establishment.name} désactivé'
+                        : '${establishment.name} activé',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+            ),
+          ),
         );
       }
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              establishment.isActive ? Icons.check_circle : Icons.pause_circle,
-              color: Colors.white,
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Erreur: ${e.toString()}',
+                    style: GoogleFonts.inter(),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                establishment.isActive
-                    ? '${establishment.name} désactivé'
-                    : '${establishment.name} activé',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-              ),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
             ),
-          ],
-        ),
-        backgroundColor: AppColors.success,
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-        ),
-      ),
-    );
+          ),
+        );
+      }
+    }
   }
 
-  Future<void> _handleDelete(Establishment establishment) async {
+  Future<void> _handleDelete(EstablishmentModel establishment) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -394,64 +467,66 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
     );
 
     if (confirmed == true && mounted) {
-      setState(() {
-        _establishments.removeWhere((e) => e.id == establishment.id);
-      });
+      try {
+        await _repository.deleteEstablishment(establishment.id);
+        await _loadEstablishments();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '${establishment.name} supprimé',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-                ),
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${establishment.name} supprimé',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-          ),
-          action: SnackBarAction(
-            label: 'Annuler',
-            textColor: AppColors.white,
-            onPressed: () {
-              // Restore establishment
-              setState(() {
-                _establishments.add(establishment);
-              });
-            },
-          ),
-        ),
-      );
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Erreur: ${e.toString()}',
+                      style: GoogleFonts.inter(),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+              ),
+            ),
+          );
+        }
+      }
     }
   }
-}
-
-/// Model class for an establishment
-class Establishment {
-  final String id;
-  final String name;
-  final String location;
-  final bool isActive;
-
-  Establishment({
-    required this.id,
-    required this.name,
-    required this.location,
-    required this.isActive,
-  });
 }
 
 /// Reusable widget for establishment list item
 /// Displays establishment info and action buttons
 class _EstablishmentListItem extends StatelessWidget {
-  final Establishment establishment;
+  final EstablishmentModel establishment;
   final VoidCallback onManage;
   final VoidCallback onEdit;
   final VoidCallback onToggleStatus;
@@ -546,7 +621,7 @@ class _EstablishmentListItem extends StatelessWidget {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              establishment.location,
+                              establishment.locationString,
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 color: AppColors.textTertiaryLight,

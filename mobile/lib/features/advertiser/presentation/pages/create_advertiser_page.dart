@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -7,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../auth/auth_controller.dart';
 import '../../../../core/services/permission_service.dart';
+import '../../data/repositories/advertiser_repository.dart';
 
 /// Multi-step registration form for creating a new advertiser establishment
 class CreateAdvertiserPage extends StatefulWidget {
@@ -27,6 +29,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
   bool _isLoading = false;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  final AdvertiserRepository _repository = AdvertiserRepository();
 
   // Form controllers
   final _nameController = TextEditingController();
@@ -204,18 +207,36 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
       final XFile? image = await picker.pickImage(
         source: source,
         imageQuality: 85,
+        maxWidth: kIsWeb ? null : 1200,
+        maxHeight: kIsWeb ? null : 1200,
       );
 
       if (image != null) {
-        final Uint8List? compressed = await FlutterImageCompress.compressWithFile(
-          image.path,
-          minWidth: 1200,
-          minHeight: 1200,
-          quality: 85,
-        );
+        Uint8List? imageBytes;
 
-        if (compressed != null) {
-          onImagePicked(compressed);
+        if (kIsWeb) {
+          // Sur le web, lire directement les bytes sans compression
+          imageBytes = await image.readAsBytes();
+        } else {
+          // Sur mobile, compresser l'image
+          try {
+            imageBytes = await FlutterImageCompress.compressWithFile(
+              image.path,
+              minWidth: 1200,
+              minHeight: 1200,
+              quality: 85,
+            );
+          } catch (compressError) {
+            if (kDebugMode) {
+              print('Erreur de compression, utilisation de l\'image originale: $compressError');
+            }
+            // En cas d'erreur de compression, utiliser l'image originale
+            imageBytes = await image.readAsBytes();
+          }
+        }
+
+        if (imageBytes != null) {
+          onImagePicked(imageBytes);
           setState(() {});
         }
       }
@@ -223,8 +244,23 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de la sélection: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Erreur lors de la sélection: ${e.toString()}',
+                    style: GoogleFonts.inter(),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+            ),
           ),
         );
       }
@@ -429,13 +465,44 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
   }
 
   Future<void> _submitForm() async {
+    if (kDebugMode) {
+      print('🚀 [CreateAdvertiserPage] Form submission started');
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // TODO: Implement actual submission to backend/Firestore
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      if (_logoImageBytes == null || _enseigneImageBytes == null) {
+        throw Exception('Logo et image enseigne sont requis');
+      }
+
+      if (_latitude == null || _longitude == null) {
+        throw Exception('Localisation requise');
+      }
+
+      if (kDebugMode) {
+        print('✅ [CreateAdvertiserPage] Validation passed, calling repository...');
+      }
+
+      await _repository.createEstablishment(
+        type: _selectedType!,
+        name: _nameController.text.trim(),
+        logoImageBytes: _logoImageBytes!,
+        enseigneImageBytes: _enseigneImageBytes!,
+        documentImageBytes: _documentImageBytes,
+        ville: _selectedVille!,
+        quartier: _quartierController.text.trim(),
+        avenue: _avenueController.text.trim(),
+        numero: _numeroController.text.trim(),
+        latitude: _latitude!,
+        longitude: _longitude!,
+      );
+
+      if (kDebugMode) {
+        print('✅ [CreateAdvertiserPage] Establishment created successfully');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
