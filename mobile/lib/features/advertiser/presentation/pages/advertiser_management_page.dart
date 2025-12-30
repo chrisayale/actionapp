@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../auth/auth_controller.dart';
 import 'create_advertiser_page.dart';
+import 'advertiser_dashboard_page.dart';
 import '../../data/models/establishment_model.dart';
 import '../../data/repositories/advertiser_repository.dart';
 
@@ -56,7 +57,7 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: AppColors.backgroundSecondaryLight,
       appBar: AppBar(
         title: Text(
           'Annonceurs',
@@ -272,28 +273,14 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
   }
 
   void _handleManage(EstablishmentModel establishment) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.settings, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Gérer: ${establishment.name}',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppColors.info,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdvertiserDashboardPage(
+          establishment: establishment,
         ),
       ),
     );
-    // TODO: Navigate to management screen
   }
 
   void _handleEdit(EstablishmentModel establishment) {
@@ -542,26 +529,19 @@ class _EstablishmentListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-        border: Border.all(
-          color: AppColors.gray200,
-          width: 0.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadowLight,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-            spreadRadius: 0,
-          ),
-        ],
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Header with name and status
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
@@ -754,7 +734,8 @@ class _EstablishmentListItem extends StatelessWidget {
               ],
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

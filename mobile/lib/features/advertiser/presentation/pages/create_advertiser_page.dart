@@ -14,10 +14,7 @@ import '../../data/repositories/advertiser_repository.dart';
 class CreateAdvertiserPage extends StatefulWidget {
   final AuthController authController;
 
-  const CreateAdvertiserPage({
-    super.key,
-    required this.authController,
-  });
+  const CreateAdvertiserPage({super.key, required this.authController});
 
   @override
   State<CreateAdvertiserPage> createState() => _CreateAdvertiserPageState();
@@ -158,7 +155,10 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
     }
   }
 
-  Future<void> _pickImage(ImageSource source, Function(Uint8List) onImagePicked) async {
+  Future<void> _pickImage(
+    ImageSource source,
+    Function(Uint8List) onImagePicked,
+  ) async {
     // Check permissions
     bool hasPermission = false;
     if (source == ImageSource.camera) {
@@ -228,7 +228,9 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
             );
           } catch (compressError) {
             if (kDebugMode) {
-              print('Erreur de compression, utilisation de l\'image originale: $compressError');
+              print(
+                'Erreur de compression, utilisation de l\'image originale: $compressError',
+              );
             }
             // En cas d'erreur de compression, utiliser l'image originale
             imageBytes = await image.readAsBytes();
@@ -283,7 +285,10 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                margin: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.md),
+                margin: const EdgeInsets.only(
+                  top: AppSpacing.sm,
+                  bottom: AppSpacing.md,
+                ),
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
@@ -347,7 +352,9 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                   _pickImage(ImageSource.camera, onImagePicked);
                 },
               ),
-              SizedBox(height: MediaQuery.of(context).padding.bottom + AppSpacing.md),
+              SizedBox(
+                height: MediaQuery.of(context).padding.bottom + AppSpacing.md,
+              ),
             ],
           ),
         ),
@@ -447,9 +454,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
             ),
             child: Text(
               'Utiliser la localisation',
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w700,
-              ),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -483,7 +488,9 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
       }
 
       if (kDebugMode) {
-        print('✅ [CreateAdvertiserPage] Validation passed, calling repository...');
+        print(
+          '✅ [CreateAdvertiserPage] Validation passed, calling repository...',
+        );
       }
 
       await _repository.createEstablishment(
@@ -514,9 +521,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                 Expanded(
                   child: Text(
                     'Établissement créé avec succès',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -569,7 +574,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.offWhite,
+      backgroundColor: AppColors.backgroundSecondaryLight,
       appBar: AppBar(
         title: Text(
           'Créer un annonceur',
@@ -616,7 +621,9 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                   child: FadeTransition(
                     opacity: _fadeAnimation,
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
+                      padding: const EdgeInsets.all(
+                        AppSpacing.screenHorizontal,
+                      ),
                       child: _buildStepContent(),
                     ),
                   ),
@@ -681,7 +688,9 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
       duration: const Duration(milliseconds: 300),
       style: GoogleFonts.inter(
         fontSize: 13,
-        fontWeight: isCurrent || isCompleted ? FontWeight.w600 : FontWeight.w400,
+        fontWeight: isCurrent || isCompleted
+            ? FontWeight.w600
+            : FontWeight.w400,
         color: isCurrent || isCompleted
             ? AppColors.yellowPrimary
             : AppColors.textTertiaryLight,
@@ -918,11 +927,7 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
               ),
             ],
           ),
-          child: Icon(
-            icon,
-            color: AppColors.white,
-            size: 24,
-          ),
+          child: Icon(icon, color: AppColors.white, size: 24),
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
@@ -963,84 +968,105 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
     required bool required,
     String? Function(String?)? validator,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
+            Row(
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+                if (required) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    '*',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextFormField(
+              controller: controller,
+              keyboardType: keyboardType,
+              validator: validator,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: GoogleFonts.inter(
+                  color: AppColors.textTertiaryLight,
+                  fontSize: 14,
+                ),
+                prefixIcon: Container(
+                  margin: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.yellowPrimary.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppColors.textPrimaryLight,
+                    size: 18,
+                  ),
+                ),
+                filled: true,
+                fillColor: AppColors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: BorderSide.none,
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: const BorderSide(color: AppColors.error),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: const BorderSide(
+                    color: AppColors.error,
+                    width: 2,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm + 4,
+                  vertical: AppSpacing.sm + 4,
+                ),
+              ),
               style: GoogleFonts.inter(
-                fontWeight: FontWeight.w600,
                 fontSize: 14,
+                fontWeight: FontWeight.w400,
                 color: AppColors.textPrimaryLight,
               ),
             ),
-            if (required) ...[
-              const SizedBox(width: 4),
-              Text(
-                '*',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: AppColors.error,
-                ),
-              ),
-            ],
           ],
         ),
-        const SizedBox(height: AppSpacing.sm),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          validator: validator,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.inter(
-              color: AppColors.textTertiaryLight,
-            ),
-            prefixIcon: Icon(
-              icon,
-              color: AppColors.yellowPrimary,
-              size: 22,
-            ),
-            filled: true,
-            fillColor: AppColors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(color: AppColors.gray200),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(color: AppColors.gray200),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(
-                color: AppColors.yellowPrimary,
-                width: 2,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(color: AppColors.error),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(
-                color: AppColors.error,
-                width: 2,
-              ),
-            ),
-            contentPadding: const EdgeInsets.all(AppSpacing.inputPadding),
-          ),
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            color: AppColors.textPrimaryLight,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -1054,98 +1080,125 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
     required Function(String?) onChanged,
     String? Function(String?)? validator,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
+            Row(
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+                if (required) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    '*',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            DropdownButtonFormField<String>(
+              value: value,
+              dropdownColor: AppColors.white,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: GoogleFonts.inter(
+                  color: AppColors.textTertiaryLight,
+                  fontSize: 14,
+                ),
+                prefixIcon: Container(
+                  margin: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.yellowPrimary.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppColors.textPrimaryLight,
+                    size: 18,
+                  ),
+                ),
+                filled: true,
+                fillColor: AppColors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: BorderSide.none,
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: const BorderSide(color: AppColors.error),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  borderSide: const BorderSide(
+                    color: AppColors.error,
+                    width: 2,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm + 4,
+                  vertical: AppSpacing.sm + 4,
+                ),
+              ),
+              items: items.map((item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(
+                    item,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (newValue) {
+                onChanged(newValue);
+                setState(() {});
+              },
+              validator: validator,
+              icon: Icon(
+                Icons.arrow_drop_down_rounded,
+                color: AppColors.textTertiaryLight,
+              ),
               style: GoogleFonts.inter(
-                fontWeight: FontWeight.w600,
                 fontSize: 14,
+                fontWeight: FontWeight.w400,
                 color: AppColors.textPrimaryLight,
               ),
             ),
-            if (required) ...[
-              const SizedBox(width: 4),
-              Text(
-                '*',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: AppColors.error,
-                ),
-              ),
-            ],
           ],
         ),
-        const SizedBox(height: AppSpacing.sm),
-        DropdownButtonFormField<String>(
-          value: value,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.inter(
-              color: AppColors.textTertiaryLight,
-            ),
-            prefixIcon: Icon(
-              icon,
-              color: AppColors.yellowPrimary,
-              size: 22,
-            ),
-            filled: true,
-            fillColor: AppColors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(color: AppColors.gray200),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(color: AppColors.gray200),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(
-                color: AppColors.yellowPrimary,
-                width: 2,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(color: AppColors.error),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              borderSide: const BorderSide(
-                color: AppColors.error,
-                width: 2,
-              ),
-            ),
-            contentPadding: const EdgeInsets.all(AppSpacing.inputPadding),
-          ),
-          items: items.map((item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(
-                item,
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: AppColors.textPrimaryLight,
-                ),
-              ),
-            );
-          }).toList(),
-          onChanged: (newValue) {
-            onChanged(newValue);
-            setState(() {});
-          },
-          validator: validator,
-          icon: Icon(
-            Icons.arrow_drop_down_rounded,
-            color: AppColors.textTertiaryLight,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -1159,202 +1212,227 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
     String? Function()? validator,
   }) {
     final errorMessage = validator?.call();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: AppColors.textPrimaryLight,
+            Row(
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+                if (required) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    '*',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: AppColors.textTertiaryLight,
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.sm),
+            GestureDetector(
+              onTap: () => _showImageSourceDialog(onImagePicked),
+              child: Container(
+                height: 150,
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundSecondaryLight,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  border: Border.all(
+                    color: errorMessage != null
+                        ? AppColors.error
+                        : AppColors.gray200.withOpacity(0.5),
+                    width: errorMessage != null ? 2 : 1,
+                  ),
+                ),
+                child: imageBytes == null
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(icon, color: AppColors.yellowPrimary, size: 48),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'Appuyez pour sélectionner',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMedium,
+                        ),
+                        child: Image.memory(
+                          imageBytes,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: 150,
+                        ),
+                      ),
               ),
             ),
-            if (required) ...[
-              const SizedBox(width: 4),
+            if (errorMessage != null) ...[
+              const SizedBox(height: 4),
               Text(
-                '*',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: AppColors.error,
-                ),
+                errorMessage,
+                style: GoogleFonts.inter(fontSize: 12, color: AppColors.error),
               ),
             ],
           ],
         ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: AppColors.textTertiaryLight,
-            ),
-          ),
-        ],
-        const SizedBox(height: AppSpacing.sm),
-        GestureDetector(
-          onTap: () => _showImageSourceDialog(onImagePicked),
-          child: Container(
-            height: 150,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              border: Border.all(
-                color: errorMessage != null ? AppColors.error : AppColors.gray200,
-                width: errorMessage != null ? 2 : 1,
-              ),
-            ),
-            child: imageBytes == null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        icon,
-                        color: AppColors.yellowPrimary,
-                        size: 48,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Appuyez pour sélectionner',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    ],
-                  )
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-                    child: Image.memory(
-                      imageBytes,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: 150,
-                    ),
-                  ),
-          ),
-        ),
-        if (errorMessage != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            errorMessage,
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: AppColors.error,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
   Widget _buildLocationPickerField() {
     final hasLocation = _latitude != null && _longitude != null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Localisation sur la carte',
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: AppColors.textPrimaryLight,
+            Row(
+              children: [
+                Text(
+                  'Localisation sur la carte',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '*',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _pickLocation,
+                icon: Icon(
+                  hasLocation ? Icons.check_circle : Icons.map_rounded,
+                  size: 20,
+                ),
+                label: Text(
+                  hasLocation
+                      ? 'Localisation définie'
+                      : 'Prendre la localisation sur la carte',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: hasLocation
+                      ? AppColors.success.withOpacity(0.1)
+                      : AppColors.yellowPrimary,
+                  foregroundColor: hasLocation
+                      ? AppColors.success
+                      : AppColors.textPrimaryLight,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm + 4,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppSpacing.radiusMedium,
+                    ),
+                    side: hasLocation
+                        ? const BorderSide(color: AppColors.success, width: 1.5)
+                        : BorderSide.none,
+                  ),
+                  elevation: 0,
+                ),
               ),
             ),
-            const SizedBox(width: 4),
-            Text(
-              '*',
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: AppColors.error,
+            if (_latitude != null && _longitude != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Lat: $_latitude, Long: $_longitude',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: AppColors.textTertiaryLight,
+                ),
               ),
-            ),
+            ],
           ],
         ),
-        const SizedBox(height: AppSpacing.sm),
-        ElevatedButton.icon(
-          onPressed: _pickLocation,
-          icon: Icon(
-            hasLocation ? Icons.check_circle : Icons.map_rounded,
-            size: 22,
-          ),
-          label: Text(
-            hasLocation ? 'Localisation définie' : 'Prendre la localisation sur la carte',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w600,
-              fontSize: 16,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: hasLocation
-                ? AppColors.success.withOpacity(0.1)
-                : AppColors.yellowPrimary,
-            foregroundColor: hasLocation ? AppColors.success : AppColors.textPrimaryLight,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md + 2,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              side: hasLocation
-                  ? const BorderSide(color: AppColors.success, width: 2)
-                  : BorderSide.none,
-            ),
-            elevation: 0,
-          ),
-        ),
-        if (_latitude != null && _longitude != null) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Lat: $_latitude, Long: $_longitude',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              color: AppColors.textTertiaryLight,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
   Widget _buildInfoCard() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.info.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-        border: Border.all(
-          color: AppColors.info.withOpacity(0.3),
-          width: 1,
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.info.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.info.withOpacity(0.3), width: 1),
         ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline_rounded,
-            color: AppColors.info,
-            size: 24,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              'Il est conseillé de prendre la localisation sur la carte lorsque vous êtes physiquement sur votre lieu de travail.',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: AppColors.textPrimaryLight,
-                height: 1.5,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline_rounded, color: AppColors.info, size: 24),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                'Il est conseillé de prendre la localisation sur la carte lorsque vous êtes physiquement sur votre lieu de travail.',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: AppColors.textPrimaryLight,
+                  height: 1.5,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1394,7 +1472,9 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                       vertical: AppSpacing.md + 2,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusXLarge,
+                      ),
                     ),
                   ),
                   child: Row(
@@ -1441,7 +1521,9 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                       vertical: AppSpacing.md + 2,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusXLarge,
+                      ),
                     ),
                     elevation: 0,
                   ),
