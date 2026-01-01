@@ -112,6 +112,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
   String? _defaultImageUrl; // URL de l'image par défaut (enseigne)
   DateTime? _startDate;
   DateTime? _endDate;
+  bool _isUnlimited = false; // Promotion continue (sans limite)
   bool _isLoading = false;
 
   @override
@@ -464,7 +465,8 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
       return;
     }
 
-    if (_startDate == null || _endDate == null) {
+    // Validation des dates seulement si la promotion n'est pas continue
+    if (!_isUnlimited && (_startDate == null || _endDate == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -494,6 +496,12 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
     });
 
     try {
+      // Si promotion continue, utiliser des dates par défaut
+      final startDate = _isUnlimited ? DateTime.now() : _startDate!;
+      final endDate = _isUnlimited 
+          ? DateTime.now().add(const Duration(days: 365 * 10)) // 10 ans pour "illimité"
+          : _endDate!;
+      
       // Create promotion via repository
       await _repository.createPromotion(
         establishmentId: widget.establishmentId!,
@@ -505,8 +513,9 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
         formule: _formuleController.text.trim(),
         imageBytes: _promotionImageBytes,
         imageUrl: _promotionImageBytes == null ? _defaultImageUrl : null,
-        startDate: _startDate!,
-        endDate: _endDate!,
+        startDate: startDate,
+        endDate: endDate,
+        isUnlimited: _isUnlimited,
       );
 
       if (mounted) {
@@ -651,27 +660,31 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                             required: true,
                           ),
                           const SizedBox(height: AppSpacing.lg),
-                          // Date Fields
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildDateField(
-                                  label: 'Date de début',
-                                  date: _startDate,
-                                  onTap: () => _selectDate(true),
+                          // Option Promotion Continue
+                          _buildUnlimitedOption(),
+                          const SizedBox(height: AppSpacing.lg),
+                          // Date Fields (masqués si promotion continue)
+                          if (!_isUnlimited)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildDateField(
+                                    label: 'Date de début',
+                                    date: _startDate,
+                                    onTap: () => _selectDate(true),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(
-                                child: _buildDateField(
-                                  label: 'Date de fin',
-                                  date: _endDate,
-                                  onTap: () => _selectDate(false),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: _buildDateField(
+                                    label: 'Date de fin',
+                                    date: _endDate,
+                                    onTap: () => _selectDate(false),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.xl),
+                              ],
+                            ),
+                          if (!_isUnlimited) const SizedBox(height: AppSpacing.xl),
                         ],
                       ),
                     ),
@@ -1241,6 +1254,89 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                 fontWeight: FontWeight.w400,
                 color: AppColors.textPrimaryLight,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUnlimitedOption() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: _isUnlimited
+              ? AppColors.yellowPrimary.withOpacity(0.1)
+              : AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _isUnlimited
+                ? AppColors.yellowPrimary.withOpacity(0.3)
+                : AppColors.gray300,
+            width: _isUnlimited ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: _isUnlimited
+                    ? AppColors.yellowPrimary.withOpacity(0.2)
+                    : AppColors.backgroundSecondaryLight,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+              ),
+              child: Icon(
+                Icons.all_inclusive_rounded,
+                color: _isUnlimited
+                    ? AppColors.yellowPrimary
+                    : AppColors.textSecondaryLight,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Promotion continue',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Sans limite de date',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: _isUnlimited,
+              onChanged: (value) {
+                setState(() {
+                  _isUnlimited = value;
+                  // Réinitialiser les dates si on désactive
+                  if (!value) {
+                    _startDate = null;
+                    _endDate = null;
+                  }
+                });
+              },
+              activeColor: AppColors.yellowPrimary,
+              activeTrackColor: AppColors.yellowPrimary.withOpacity(0.5),
             ),
           ],
         ),

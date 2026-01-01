@@ -8,6 +8,8 @@ import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/services/firebase_service.dart';
+import '../../../advertiser/data/models/promotion_model.dart';
+import '../../../advertiser/data/repositories/advertiser_repository.dart';
 
 class HomePage extends StatefulWidget {
   final AuthController authController;
@@ -37,6 +39,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late Animation<double> _fadeAnimation;
   late Animation<double> _glowAnimation;
   late Animation<Color?> _colorAnimation;
+  
+  // Promotions publiques
+  List<PromotionModel> _promotions = [];
+  bool _isLoadingPromotions = false;
+  final AdvertiserRepository _repository = AdvertiserRepository();
   
   // Contrôleurs pour le dialogue de modification du PIN
   final List<TextEditingController> _pinDialogControllers = List.generate(
@@ -121,6 +128,35 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       ),
     );
     _animationController.forward();
+    _loadPublicPromotions();
+  }
+  
+  Future<void> _loadPublicPromotions() async {
+    setState(() {
+      _isLoadingPromotions = true;
+    });
+
+    try {
+      final promotions = await _repository.getPublicPromotions();
+      if (mounted) {
+        setState(() {
+          _promotions = promotions;
+          _isLoadingPromotions = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors du chargement des promotions: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        setState(() {
+          _isLoadingPromotions = false;
+        });
+      }
+    }
   }
 
   @override
@@ -919,73 +955,71 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildEstablishmentsList() {
-    // Données des établissements
-    final establishments = [
-      {
-        'name': 'RDC BAR',
-        'location': 'KAVA/GOMBE, Kinshasa',
-        'offer': 'Beaufort',
-        'promotion': '2+1=3',
-        'price': '3 000 CDF',
-        'isActive': true,
-        'distance': '0.5 km',
-        'rating': 4.5,
-      },
-      {
-        'name': 'Bistro Le Soleil d\'Or',
-        'location': 'GOMBE, Kinshasa',
-        'offer': 'Menu du jour',
-        'promotion': '1+1=2',
-        'price': '5 000 CDF',
-        'isActive': true,
-        'distance': '1.2 km',
-        'rating': 4.8,
-      },
-      {
-        'name': 'Café Central',
-        'location': 'LINGWALA, Kinshasa',
-        'offer': 'Café expresso',
-        'promotion': 'Réduction 20%',
-        'price': '2 500 CDF',
-        'isActive': false,
-        'distance': '2.1 km',
-        'rating': 4.2,
-      },
-    ];
+    if (_isLoadingPromotions) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.lg),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.yellowPrimary),
+          ),
+        ),
+      );
+    }
+
+    if (_promotions.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
+        child: Center(
+          child: Text(
+            'Aucune promotion publique disponible pour le moment.',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              color: AppColors.textSecondaryLight,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
 
     if (_isGridView) {
-      return _buildEstablishmentsGrid(establishments);
+      return _buildPromotionsGrid(_promotions);
     } else {
-      return _buildEstablishmentsListView(establishments);
+      return _buildPromotionsListView(_promotions);
     }
   }
-
-  Widget _buildEstablishmentsListView(List<Map<String, dynamic>> establishments) {
+  
+  Widget _buildPromotionsListView(List<PromotionModel> promotions) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Liste des établissements avec design amélioré
-          for (var establishment in establishments) ...[
-            _buildEstablishmentCard(
-              name: establishment['name'] as String,
-              location: establishment['location'] as String,
-              offer: establishment['offer'] as String,
-              promotion: establishment['promotion'] as String,
-              price: establishment['price'] as String,
-              isActive: establishment['isActive'] as bool,
-              distance: establishment['distance'] as String,
-              rating: establishment['rating'] as double,
-            ),
-            if (establishment != establishments.last) const SizedBox(height: AppSpacing.md),
+          for (var promotion in promotions) ...[
+            _buildPromotionCard(promotion),
+            if (promotion != promotions.last) const SizedBox(height: AppSpacing.md),
           ],
         ],
       ),
     );
   }
-
-  Widget _buildEstablishmentsGrid(List<Map<String, dynamic>> establishments) {
+  
+  Widget _buildPromotionCard(PromotionModel promotion) {
+    return _buildEstablishmentCard(
+      name: promotion.establishmentName,
+      location: 'Kinshasa',
+      offer: promotion.boissonName,
+      promotion: promotion.formule,
+      price: '',
+      isActive: promotion.isActive,
+      distance: '0 km',
+      rating: 4.5,
+      imageUrl: promotion.imageUrl,
+      establishmentLogoUrl: promotion.establishmentLogoUrl,
+    );
+  }
+  
+  Widget _buildPromotionsGrid(List<PromotionModel> promotions) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal),
       child: GridView.builder(
@@ -997,21 +1031,27 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           mainAxisSpacing: AppSpacing.md,
           childAspectRatio: 0.75,
         ),
-        itemCount: establishments.length,
+        itemCount: promotions.length,
         itemBuilder: (context, index) {
-          final establishment = establishments[index];
-          return _buildEstablishmentGridCard(
-            name: establishment['name'] as String,
-            location: establishment['location'] as String,
-            offer: establishment['offer'] as String,
-            promotion: establishment['promotion'] as String,
-            price: establishment['price'] as String,
-            isActive: establishment['isActive'] as bool,
-            distance: establishment['distance'] as String,
-            rating: establishment['rating'] as double,
-          );
+          final promotion = promotions[index];
+          return _buildPromotionGridCard(promotion);
         },
       ),
+    );
+  }
+  
+  Widget _buildPromotionGridCard(PromotionModel promotion) {
+    return _buildEstablishmentGridCard(
+      name: promotion.establishmentName,
+      location: 'Kinshasa',
+      offer: promotion.boissonName,
+      promotion: promotion.formule,
+      price: '',
+      isActive: promotion.isActive,
+      distance: '0 km',
+      rating: 4.5,
+      imageUrl: promotion.imageUrl,
+      establishmentLogoUrl: promotion.establishmentLogoUrl,
     );
   }
 
@@ -1024,6 +1064,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required bool isActive,
     required String distance,
     required double rating,
+    String? imageUrl,
+    String? establishmentLogoUrl,
   }) {
     return AnimatedBuilder(
       animation: _animationController,
@@ -1070,18 +1112,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Panneau jaune à gauche avec icône animé
+                    // Panneau jaune à gauche avec image ou icône animé
                     Container(
                       width: 100,
+                      height: 140,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            _colorAnimation.value ?? const Color(0xFFFFD700),
-                            const Color(0xFFFF6B35),
-                          ],
-                        ),
+                        gradient: imageUrl == null || imageUrl.isEmpty
+                            ? LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  _colorAnimation.value ?? const Color(0xFFFFD700),
+                                  const Color(0xFFFF6B35),
+                                ],
+                              )
+                            : null,
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(20),
                           bottomLeft: Radius.circular(20),
@@ -1096,14 +1141,48 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           ),
                         ],
                       ),
-                child: Center(
-                  child: Icon(
-                    Icons.local_drink,
-                    size: 50,
-                    color: AppColors.gray900,
-                  ),
-                ),
-              ),
+                      child: imageUrl != null && imageUrl.isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                bottomLeft: Radius.circular(20),
+                              ),
+                              child: Image.network(
+                                imageUrl,
+                                width: 100,
+                                height: 140,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Center(
+                                    child: Icon(
+                                      Icons.local_drink,
+                                      size: 50,
+                                      color: AppColors.gray900,
+                                    ),
+                                  );
+                                },
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value: loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress.cumulativeBytesLoaded /
+                                              loadingProgress.expectedTotalBytes!
+                                          : null,
+                                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.yellowPrimary),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          : Center(
+                              child: Icon(
+                                Icons.local_drink,
+                                size: 50,
+                                color: AppColors.gray900,
+                              ),
+                            ),
+                    ),
               // Panneau blanc à droite avec contenu
               Expanded(
                 child: Padding(
@@ -1338,6 +1417,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required bool isActive,
     required String distance,
     required double rating,
+    String? imageUrl,
+    String? establishmentLogoUrl,
   }) {
     return AnimatedBuilder(
       animation: _animationController,
@@ -1378,18 +1459,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header avec panneau jaune et icône
+                    // Header avec panneau jaune et icône ou image
                     Container(
                       height: 100,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            _colorAnimation.value ?? const Color(0xFFFFD700),
-                            const Color(0xFFFF6B35),
-                          ],
-                        ),
+                        gradient: imageUrl == null || imageUrl.isEmpty
+                            ? LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  _colorAnimation.value ?? const Color(0xFFFFD700),
+                                  const Color(0xFFFF6B35),
+                                ],
+                              )
+                            : null,
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(16),
                           topRight: Radius.circular(16),
@@ -1406,13 +1489,48 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
                       child: Stack(
                         children: [
-                          Center(
-                            child: Icon(
-                              Icons.local_drink,
-                              size: 40,
-                              color: AppColors.gray900,
+                          if (imageUrl != null && imageUrl.isNotEmpty)
+                            ClipRRect(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(16),
+                                topRight: Radius.circular(16),
+                              ),
+                              child: Image.network(
+                                imageUrl,
+                                width: double.infinity,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Center(
+                                    child: Icon(
+                                      Icons.local_drink,
+                                      size: 40,
+                                      color: AppColors.gray900,
+                                    ),
+                                  );
+                                },
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value: loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress.cumulativeBytesLoaded /
+                                              loadingProgress.expectedTotalBytes!
+                                          : null,
+                                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.yellowPrimary),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          else
+                            Center(
+                              child: Icon(
+                                Icons.local_drink,
+                                size: 40,
+                                color: AppColors.gray900,
+                              ),
                             ),
-                          ),
                           if (isActive)
                             Positioned(
                               top: 8,

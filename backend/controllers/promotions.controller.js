@@ -62,6 +62,7 @@ const createPromotion = async (req, res) => {
       imageUrl,
       startDate,
       endDate,
+      isUnlimited = false,
     } = req.body;
 
     // Validation
@@ -72,10 +73,11 @@ const createPromotion = async (req, res) => {
       });
     }
 
-    if (!startDate || !endDate) {
+    // Dates are required unless promotion is unlimited
+    if (!isUnlimited && (!startDate || !endDate)) {
       return res.status(400).json({
         success: false,
-        error: 'startDate and endDate are required',
+        error: 'startDate and endDate are required when promotion is not unlimited',
       });
     }
 
@@ -137,7 +139,7 @@ const createPromotion = async (req, res) => {
       startDate: startDateObj,
       endDate: endDateObj,
       isActive: true,
-      isUnlimited: false,
+      isUnlimited: Boolean(isUnlimited),
       createdAt: now,
       updatedAt: now,
     };
@@ -186,6 +188,89 @@ const createPromotion = async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to create promotion',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Get all public active promotions (for home page)
+ * GET /api/promotions/public
+ * No authentication required
+ */
+const getPublicPromotions = async (req, res) => {
+  try {
+    console.log('📋 Getting public promotions...');
+    
+    const now = admin.firestore.Timestamp.now();
+    
+    // Get all active promotions
+    // Note: We can't use orderBy with where on different fields without a composite index
+    // So we'll fetch all active promotions and sort in memory
+    const activePromotionsQuery = db
+      .collection('promotions')
+      .where('isActive', '==', true);
+    
+    const snapshot = await activePromotionsQuery.get();
+    
+    // Filter promotions that are either unlimited or still valid
+    const promotions = snapshot.docs
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+        };
+      })
+      .filter((promotion) => {
+        // If unlimited, always include
+        if (promotion.isUnlimited === true) {
+          return true;
+        }
+        
+        // Check if endDate is in the future
+        let endDate;
+        if (promotion.endDate?.toDate) {
+          endDate = promotion.endDate.toDate();
+        } else if (promotion.endDate instanceof Date) {
+          endDate = promotion.endDate;
+        } else if (promotion.endDate) {
+          endDate = new Date(promotion.endDate);
+        } else {
+          return false; // No endDate and not unlimited
+        }
+        
+        const nowDate = new Date();
+        return endDate >= nowDate;
+      })
+      .map((promotion) => {
+        // Convert timestamps to ISO strings
+        return {
+          id: promotion.id,
+          ...convertTimestamps(promotion),
+        };
+      })
+      // Sort by createdAt descending (most recent first)
+      .sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA; // Descending order
+      });
+    
+    console.log(`✅ Found ${promotions.length} public active promotions`);
+    
+    res.json({
+      success: true,
+      promotions,
+      count: promotions.length,
+    });
+  } catch (error) {
+    console.error('\n❌ Error getting public promotions:');
+    console.error('   Message:', error.message);
+    console.error('   Stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get public promotions',
       message: error.message,
     });
   }
@@ -606,6 +691,7 @@ const continuePromotion = async (req, res) => {
 
 module.exports = {
   createPromotion,
+  getPublicPromotions,
   getPromotions,
   getPromotionById,
   updatePromotion,
