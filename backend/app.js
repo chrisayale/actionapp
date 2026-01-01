@@ -9,8 +9,8 @@ dotenv.config();
 // Configure Firestore emulator for local development
 // This allows the backend to use Firestore emulator instead of production
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
-  process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8081';
-  console.log('🔧 Auto-configuring Firestore emulator: localhost:8081');
+  process.env.FIRESTORE_EMULATOR_HOST = 'localhost:9081';
+  console.log('🔧 Auto-configuring Firestore emulator: localhost:9081');
   console.log('   (Set FIRESTORE_EMULATOR_HOST in .env to override or disable)');
 }
 

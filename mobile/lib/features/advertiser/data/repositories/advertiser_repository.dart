@@ -155,37 +155,64 @@ class AdvertiserRepository {
         print('⏳ [AdvertiserRepository] Attempting connection to: $apiUrl');
       }
 
-      // Use http.post directly with timeout
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $idToken',
-        },
-        body: jsonEncode(requestBody),
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          if (kDebugMode) {
-            print('❌ [AdvertiserRepository] Request timeout after 15 seconds');
-            print('   This usually means the server is not reachable');
-            print('   Check that the backend is running on port 3000');
-          }
-          throw Exception('Timeout: Le serveur ne répond pas après 15 secondes.\n\n'
-              'Vérifiez que:\n'
-              '1. Le backend est démarré (cd backend && npm run dev)\n'
-              '2. Le backend écoute sur le port 3000\n'
-              '3. L\'émulateur peut accéder à http://10.0.2.2:3000');
-        },
-      ).catchError((error) {
+      // Use http.Client with timeout for better control
+      final client = http.Client();
+      try {
+        final response = await client
+            .post(
+              Uri.parse(apiUrl),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $idToken',
+              },
+              body: jsonEncode(requestBody),
+            )
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                if (kDebugMode) {
+                  print('❌ [AdvertiserRepository] Request timeout after 30 seconds');
+                  print('   This usually means the server is not reachable');
+                  print('   Check that the backend is running on port 3000');
+                }
+                throw Exception('Timeout: Le serveur ne répond pas après 30 secondes.\n\n'
+                    'Vérifiez que:\n'
+                    '1. Le backend est démarré (cd backend && npm run dev)\n'
+                    '2. Le backend écoute sur le port 3000\n'
+                    '3. L\'émulateur peut accéder à http://10.0.2.2:3000');
+              },
+            );
+        
         if (kDebugMode) {
-          print('❌ [AdvertiserRepository] Connection error: $error');
-          print('   Error type: ${error.runtimeType}');
+          print('📥 [AdvertiserRepository] Response received');
+          print('   Status: ${response.statusCode}');
+          print('   Body: ${response.body.substring(0, math.min(response.body.length, 500))}');
         }
-        if (error.toString().contains('Connection refused') || 
-            error.toString().contains('Failed host lookup') ||
-            error.toString().contains('SocketException') ||
-            error.toString().contains('Network is unreachable')) {
+
+        client.close();
+        
+        if (response.statusCode == 201) {
+          final data = jsonDecode(response.body);
+          if (data['success'] == true) {
+            return EstablishmentModel.fromJson(data['establishment']);
+          } else {
+            throw Exception(data['error'] ?? 'Failed to create establishment');
+          }
+        } else {
+          final errorData = jsonDecode(response.body);
+          throw Exception(errorData['error'] ?? 'Failed to create establishment');
+        }
+      } catch (e) {
+        client.close();
+        if (kDebugMode) {
+          print('❌ [AdvertiserRepository] Connection error: $e');
+          print('   Error type: ${e.runtimeType}');
+        }
+        if (e.toString().contains('Connection refused') || 
+            e.toString().contains('Failed host lookup') ||
+            e.toString().contains('SocketException') ||
+            e.toString().contains('Network is unreachable') ||
+            e.toString().contains('Timeout')) {
           throw Exception(
             'Impossible de se connecter au serveur.\n\n'
             'Vérifiez que:\n'
@@ -193,38 +220,19 @@ class AdvertiserRepository {
             '2. Le backend écoute sur le port 3000\n'
             '3. L\'émulateur peut accéder à http://10.0.2.2:3000\n\n'
             'URL: $apiUrl\n'
-            'Erreur: $error'
+            'Erreur: $e'
           );
         }
-        throw error;
-      });
-
-      if (kDebugMode) {
-        print('📥 [AdvertiserRepository] Response received');
-        print('   Status: ${response.statusCode}');
-        print('   Body: ${response.body.substring(0, math.min(response.body.length, 500))}');
-      }
-
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          return EstablishmentModel.fromJson(data['establishment']);
-        } else {
-          throw Exception(data['error'] ?? 'Failed to create establishment');
-        }
-      } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(errorData['error'] ?? 'Failed to create establishment');
+        throw e;
       }
     } catch (e) {
-      // Re-throw if it's already an Exception from catchError or timeout
-      if (e is Exception) {
-        rethrow;
-      }
       // Handle any other unexpected errors
       if (kDebugMode) {
         print('❌ [AdvertiserRepository] Unexpected error: $e');
         print('   Error type: ${e.runtimeType}');
+      }
+      if (e is Exception) {
+        rethrow;
       }
       throw Exception('Erreur inattendue: $e');
     }

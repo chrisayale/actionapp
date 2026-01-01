@@ -45,7 +45,7 @@ Future<void> _connectToFirebaseEmulators() async {
     await FirebaseAuth.instance.useAuthEmulator(host, 9099);
 
     // Connecter Firestore Emulator
-    FirebaseFirestore.instance.useFirestoreEmulator(host, 8081);
+    FirebaseFirestore.instance.useFirestoreEmulator(host, 9081);
 
     // Connecter Storage Emulator
     FirebaseStorage.instance.useStorageEmulator(host, 9199);
@@ -54,7 +54,7 @@ Future<void> _connectToFirebaseEmulators() async {
       print('✅ Connecté aux emulators Firebase locaux');
       print('   - Host: $host');
       print('   - Auth: $host:9099');
-      print('   - Firestore: $host:8081');
+      print('   - Firestore: $host:9081');
       print('   - Storage: $host:9199');
       print('');
       print(

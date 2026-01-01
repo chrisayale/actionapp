@@ -400,64 +400,191 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
     // In a real app, you would open a map picker here
     final result = await showDialog<Map<String, double>>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
-        ),
-        title: Row(
-          children: [
-            const Icon(Icons.map, color: AppColors.yellowPrimary),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              'Localisation',
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w700,
-                fontSize: 20,
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Fonctionnalité de sélection de carte à implémenter.\n\nPour l\'instant, utilisez un point de localisation par défaut.',
-          style: GoogleFonts.inter(
-            fontSize: 15,
-            color: AppColors.textSecondaryLight,
-            height: 1.5,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with icon and title
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: AppColors.yellowPrimary.withOpacity(0.1),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(AppSpacing.radiusXLarge),
+                    topRight: Radius.circular(AppSpacing.radiusXLarge),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: AppColors.yellowPrimary,
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMedium,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.yellowPrimary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.map_rounded,
+                        color: AppColors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Text(
+                        'Localisation',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 22,
+                          color: AppColors.textPrimaryLight,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Fonctionnalité de sélection de carte',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimaryLight,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'À implémenter.\n\nPour l\'instant, utilisez un point de localisation par défaut.',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        color: AppColors.textSecondaryLight,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Actions
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: AppColors.gray300,
+                            width: 1.5,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.md,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMedium,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          'Annuler',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: AppColors.textPrimaryLight,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMedium,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.yellowPrimary.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // Mock coordinates (Kinshasa center)
+                            Navigator.pop(context, {
+                              'latitude': -4.3276,
+                              'longitude': 15.3136,
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.yellowPrimary,
+                            foregroundColor: AppColors.textPrimaryLight,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.md,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMedium,
+                              ),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Utiliser la localisation',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Annuler',
-              style: GoogleFonts.inter(
-                color: AppColors.textSecondaryLight,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // Mock coordinates (Kinshasa center)
-              Navigator.pop(context, {
-                'latitude': -4.3276,
-                'longitude': 15.3136,
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.yellowPrimary,
-              foregroundColor: AppColors.textPrimaryLight,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-              ),
-              elevation: 0,
-            ),
-            child: Text(
-              'Utiliser la localisation',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
       ),
     );
 
@@ -1412,23 +1539,53 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.info.withOpacity(0.1),
+          color: AppColors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.info.withOpacity(0.3), width: 1),
+          border: Border.all(
+            color: AppColors.info.withOpacity(0.2),
+            width: 1.5,
+          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.info_outline_rounded, color: AppColors.info, size: 24),
-            const SizedBox(width: AppSpacing.sm),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.info.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.info_outline_rounded,
+                color: AppColors.info,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
-              child: Text(
-                'Il est conseillé de prendre la localisation sur la carte lorsque vous êtes physiquement sur votre lieu de travail.',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: AppColors.textPrimaryLight,
-                  height: 1.5,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Conseil',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.info,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Il est conseillé de prendre la localisation sur la carte lorsque vous êtes physiquement sur votre lieu de travail.',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textPrimaryLight,
+                      height: 1.6,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../data/models/establishment_model.dart';
+import 'create_promotion_page.dart';
+import 'promotions_list_page.dart';
 
 /// Professional dashboard screen for managing advertiser establishment
 /// Displays KPIs, promotions, subscriptions, and advertiser profile
@@ -394,17 +396,14 @@ class AdvertiserDashboardPage extends StatelessWidget {
                 label: 'Nouvelle promotion',
                 color: AppColors.yellowPrimary,
                 onPressed: () {
-                  // TODO: Navigate to create promotion
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Créer une promotion',
-                        style: GoogleFonts.inter(),
-                      ),
-                      backgroundColor: AppColors.success,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CreatePromotionPage(
+                        establishmentId: establishment.id,
+                        establishmentName: establishment.name,
+                        enseigneUrl: establishment.enseigneUrl,
+                        logoUrl: establishment.logoUrl,
                       ),
                     ),
                   );
@@ -549,7 +548,17 @@ class AdvertiserDashboardPage extends StatelessWidget {
                 ),
                 TextButton(
                   onPressed: () {
-                    // TODO: Navigate to all promotions
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PromotionsListPage(
+                          establishmentId: establishment.id,
+                          establishmentName: establishment.name,
+                          establishmentLogoUrl: establishment.logoUrl,
+                          enseigneUrl: establishment.enseigneUrl,
+                        ),
+                      ),
+                    );
                   },
                   child: Text(
                     'Voir tout',
@@ -665,17 +674,14 @@ class AdvertiserDashboardPage extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // TODO: Navigate to create promotion
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Créer une promotion',
-                        style: GoogleFonts.inter(),
-                      ),
-                      backgroundColor: AppColors.success,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CreatePromotionPage(
+                        establishmentId: establishment.id,
+                        establishmentName: establishment.name,
+                        enseigneUrl: establishment.enseigneUrl,
+                        logoUrl: establishment.logoUrl,
                       ),
                     ),
                   );
