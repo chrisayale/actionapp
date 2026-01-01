@@ -603,6 +603,8 @@ class AdvertiserRepository {
     required String formule,
     Uint8List? imageBytes,
     String? imageUrl, // Use this if imageBytes is null
+    double? price,
+    String? currency,
     required DateTime startDate,
     required DateTime endDate,
     bool isUnlimited = false,
@@ -653,6 +655,8 @@ class AdvertiserRepository {
         'boissonImageUrl': boissonImageUrl,
         'formule': formule,
         'imageUrl': finalImageUrl,
+        'price': price,
+        'currency': currency,
         'startDate': startDate.toIso8601String(),
         'endDate': endDate.toIso8601String(),
         'isUnlimited': isUnlimited,
@@ -727,6 +731,73 @@ class AdvertiserRepository {
           );
         }
         throw e;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ [AdvertiserRepository] Unexpected error: $e');
+      }
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Erreur inattendue: $e');
+    }
+  }
+
+  /// Increment interested count (like button) - Public endpoint (no auth required)
+  /// POST /api/promotions/:id/interested
+  Future<PromotionModel> incrementInterestedCount(String promotionId) async {
+    try {
+      if (kDebugMode) {
+        print('👍 [AdvertiserRepository] Incrementing interested count for promotion: $promotionId');
+      }
+
+      final apiUrl = '${ApiConstants.baseUrl}${ApiConstants.promotions}/$promotionId/interested';
+      if (kDebugMode) {
+        print('🌐 [AdvertiserRepository] Sending POST request to: $apiUrl');
+      }
+
+      final client = http.Client();
+      try {
+        final response = await client
+            .post(Uri.parse(apiUrl))
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                if (kDebugMode) {
+                  print('❌ [AdvertiserRepository] Request timeout after 30 seconds');
+                }
+                throw Exception('Timeout: Le serveur ne répond pas après 30 secondes.');
+              },
+            );
+
+        if (kDebugMode) {
+          print('📥 [AdvertiserRepository] Response received');
+          print('   Status: ${response.statusCode}');
+        }
+
+        client.close();
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['success'] == true && data['promotion'] != null) {
+            final promotion = PromotionModel.fromJson(data['promotion'] as Map<String, dynamic>);
+            if (kDebugMode) {
+              print('✅ [AdvertiserRepository] Interested count incremented. New count: ${promotion.interestedCount}');
+            }
+            return promotion;
+          } else {
+            throw Exception(data['error'] ?? 'Failed to increment interested count');
+          }
+        } else {
+          final errorData = jsonDecode(response.body);
+          throw Exception(errorData['error'] ?? 'Failed to increment interested count');
+        }
+      } catch (e) {
+        client.close();
+        if (kDebugMode) {
+          print('❌ [AdvertiserRepository] Error incrementing interested count: $e');
+        }
+        rethrow;
       }
     } catch (e) {
       if (kDebugMode) {

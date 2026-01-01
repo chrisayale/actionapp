@@ -53,7 +53,10 @@ class CreatePromotionPage extends StatefulWidget {
 class _CreatePromotionPageState extends State<CreatePromotionPage> {
   final _formKey = GlobalKey<FormState>();
   final _formuleController = TextEditingController();
+  final _priceController = TextEditingController();
   final AdvertiserRepository _repository = AdvertiserRepository();
+  
+  String? _selectedCurrency; // 'CDF' ou 'USD'
 
   // Mock list of drinks - In production, this would come from API
   final List<DrinkModel> _drinks = [
@@ -127,6 +130,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
   @override
   void dispose() {
     _formuleController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -502,6 +506,60 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
           ? DateTime.now().add(const Duration(days: 365 * 10)) // 10 ans pour "illimité"
           : _endDate!;
       
+      // Parse price
+      final priceText = _priceController.text.trim().replaceAll(',', '.');
+      final price = double.tryParse(priceText);
+      
+      if (price == null || price <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Veuillez entrer un prix valide',
+                    style: GoogleFonts.inter(),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.warning,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+            ),
+          ),
+        );
+        return;
+      }
+      
+      if (_selectedCurrency == null || _selectedCurrency!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Veuillez sélectionner une devise',
+                    style: GoogleFonts.inter(),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.warning,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+            ),
+          ),
+        );
+        return;
+      }
+      
       // Create promotion via repository
       await _repository.createPromotion(
         establishmentId: widget.establishmentId!,
@@ -513,6 +571,8 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
         formule: _formuleController.text.trim(),
         imageBytes: _promotionImageBytes,
         imageUrl: _promotionImageBytes == null ? _defaultImageUrl : null,
+        price: price,
+        currency: _selectedCurrency!,
         startDate: startDate,
         endDate: endDate,
         isUnlimited: _isUnlimited,
@@ -659,6 +719,9 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                             icon: Icons.calculate_rounded,
                             required: true,
                           ),
+                          const SizedBox(height: AppSpacing.lg),
+                          // Prix et Devise
+                          _buildPriceAndCurrencyField(),
                           const SizedBox(height: AppSpacing.lg),
                           // Option Promotion Continue
                           _buildUnlimitedOption(),
@@ -1254,6 +1317,187 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                 fontWeight: FontWeight.w400,
                 color: AppColors.textPrimaryLight,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceAndCurrencyField() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Prix',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '*',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: _priceController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Requis';
+                      }
+                      final price = double.tryParse(value.replaceAll(',', '.'));
+                      if (price == null || price <= 0) {
+                        return 'Prix invalide';
+                      }
+                      return null;
+                    },
+                    decoration: InputDecoration(
+                      hintText: '0.00',
+                      hintStyle: GoogleFonts.inter(
+                        color: AppColors.textTertiaryLight,
+                        fontSize: 14,
+                      ),
+                      prefixIcon: Container(
+                        margin: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: AppColors.yellowPrimary.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.attach_money_rounded,
+                          color: AppColors.textPrimaryLight,
+                          size: 18,
+                        ),
+                      ),
+                      filled: true,
+                      fillColor: AppColors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm + 4,
+                        vertical: AppSpacing.sm + 4,
+                      ),
+                    ),
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  flex: 1,
+                  child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundSecondaryLight,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                      ),
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedCurrency,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: AppColors.backgroundSecondaryLight,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm + 4,
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Requis';
+                          }
+                          return null;
+                        },
+                        hint: Text(
+                          'Devise',
+                          style: GoogleFonts.inter(
+                            color: AppColors.textTertiaryLight,
+                            fontSize: 14,
+                          ),
+                        ),
+                        items: ['CDF', 'USD'].map((String currency) {
+                          return DropdownMenuItem<String>(
+                            value: currency,
+                            child: Text(
+                              currency,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimaryLight,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedCurrency = newValue;
+                          });
+                        },
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimaryLight,
+                        ),
+                        dropdownColor: AppColors.white,
+                        icon: Icon(
+                          Icons.arrow_drop_down_rounded,
+                          color: AppColors.textPrimaryLight,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

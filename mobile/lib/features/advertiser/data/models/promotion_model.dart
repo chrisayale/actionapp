@@ -9,10 +9,13 @@ class PromotionModel {
   final String? boissonImageUrl;
   final String formule;
   final String? imageUrl;
+  final double? price; // Prix de la promotion
+  final String? currency; // Devise: 'CDF' ou 'USD'
   final DateTime startDate;
   final DateTime endDate;
   final bool isActive;
   final bool isUnlimited; // Promotion sans limite (continuée)
+  final int interestedCount; // Nombre de personnes intéressées (comme "J'aime")
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -26,10 +29,13 @@ class PromotionModel {
     this.boissonImageUrl,
     required this.formule,
     this.imageUrl,
+    this.price,
+    this.currency,
     required this.startDate,
     required this.endDate,
     required this.isActive,
     this.isUnlimited = false,
+    this.interestedCount = 0,
     this.createdAt,
     this.updatedAt,
   });
@@ -45,6 +51,8 @@ class PromotionModel {
       boissonImageUrl: json['boissonImageUrl'] as String?,
       formule: json['formule'] as String? ?? '',
       imageUrl: json['imageUrl'] as String?,
+      price: json['price'] != null ? (json['price'] is num ? (json['price'] as num).toDouble() : double.tryParse(json['price'].toString())) : null,
+      currency: json['currency'] as String?,
       startDate: json['startDate'] != null
           ? (json['startDate'] is DateTime
               ? json['startDate'] as DateTime
@@ -71,6 +79,7 @@ class PromotionModel {
           : DateTime.now(),
       isActive: json['isActive'] as bool? ?? true,
       isUnlimited: json['isUnlimited'] as bool? ?? false,
+      interestedCount: json['interestedCount'] != null ? (json['interestedCount'] is int ? json['interestedCount'] as int : int.tryParse(json['interestedCount'].toString()) ?? 0) : 0,
       createdAt: json['createdAt'] != null
           ? (json['createdAt'] is DateTime
               ? json['createdAt'] as DateTime
@@ -109,10 +118,13 @@ class PromotionModel {
       'boissonImageUrl': boissonImageUrl,
       'formule': formule,
       'imageUrl': imageUrl,
+      'price': price,
+      'currency': currency,
       'startDate': startDate.toIso8601String(),
       'endDate': endDate.toIso8601String(),
       'isActive': isActive,
       'isUnlimited': isUnlimited,
+      'interestedCount': interestedCount,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
@@ -128,10 +140,13 @@ class PromotionModel {
     String? boissonImageUrl,
     String? formule,
     String? imageUrl,
+    double? price,
+    String? currency,
     DateTime? startDate,
     DateTime? endDate,
     bool? isActive,
     bool? isUnlimited,
+    int? interestedCount,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -145,10 +160,13 @@ class PromotionModel {
       boissonImageUrl: boissonImageUrl ?? this.boissonImageUrl,
       formule: formule ?? this.formule,
       imageUrl: imageUrl ?? this.imageUrl,
+      price: price ?? this.price,
+      currency: currency ?? this.currency,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
       isActive: isActive ?? this.isActive,
       isUnlimited: isUnlimited ?? this.isUnlimited,
+      interestedCount: interestedCount ?? this.interestedCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

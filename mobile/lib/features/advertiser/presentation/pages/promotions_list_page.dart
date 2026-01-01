@@ -1085,6 +1085,18 @@ class _PromotionListItem extends StatelessWidget {
     required this.formatDate,
   });
 
+  /// Format price with currency
+  String _formatPrice(PromotionModel promotion) {
+    if (promotion.price == null) {
+      return 'N/A';
+    }
+    final formattedPrice = promotion.price!.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]} ',
+    );
+    return '$formattedPrice ${promotion.currency ?? ''}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isExpired = !promotion.isUnlimited && promotion.endDate.isBefore(DateTime.now());
@@ -1230,6 +1242,28 @@ class _PromotionListItem extends StatelessWidget {
                             color: AppColors.textSecondaryLight,
                           ),
                         ),
+                        // Prix
+                        if (promotion.price != null) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.attach_money_rounded,
+                                size: 14,
+                                color: AppColors.info,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatPrice(promotion),
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.info,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: AppSpacing.xs),
                         // Dates
                         Row(

@@ -159,6 +159,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
+  Future<void> _incrementInterestedCount(PromotionModel promotion) async {
+    try {
+      final updatedPromotion = await _repository.incrementInterestedCount(promotion.id);
+      if (mounted) {
+        setState(() {
+          final index = _promotions.indexWhere((p) => p.id == promotion.id);
+          if (index != -1) {
+            _promotions[index] = updatedPromotion;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'incrémentation: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -1004,18 +1027,33 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
   
+  /// Format price with currency
+  String _formatPrice(PromotionModel promotion) {
+    if (promotion.price == null) {
+      return 'N/A';
+    }
+    final formattedPrice = promotion.price!.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]} ',
+    );
+    return '${formattedPrice} ${promotion.currency ?? ''}';
+  }
+
   Widget _buildPromotionCard(PromotionModel promotion) {
     return _buildEstablishmentCard(
       name: promotion.establishmentName,
       location: 'Kinshasa',
       offer: promotion.boissonName,
       promotion: promotion.formule,
-      price: '',
+      price: _formatPrice(promotion),
       isActive: promotion.isActive,
       distance: '0 km',
       rating: 4.5,
-      imageUrl: promotion.imageUrl,
+      imageUrl: promotion.boissonImageUrl, // Utiliser l'image de la boisson
       establishmentLogoUrl: promotion.establishmentLogoUrl,
+      interestedCount: promotion.interestedCount,
+      promotionId: promotion.id,
+      onInterestedTap: () => _incrementInterestedCount(promotion),
     );
   }
   
@@ -1046,12 +1084,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       location: 'Kinshasa',
       offer: promotion.boissonName,
       promotion: promotion.formule,
-      price: '',
+      price: _formatPrice(promotion),
       isActive: promotion.isActive,
       distance: '0 km',
       rating: 4.5,
-      imageUrl: promotion.imageUrl,
+      imageUrl: promotion.boissonImageUrl, // Utiliser l'image de la boisson
       establishmentLogoUrl: promotion.establishmentLogoUrl,
+      interestedCount: promotion.interestedCount,
+      promotionId: promotion.id,
+      onInterestedTap: () => _incrementInterestedCount(promotion),
     );
   }
 
@@ -1066,6 +1107,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required double rating,
     String? imageUrl,
     String? establishmentLogoUrl,
+    int interestedCount = 0,
+    String? promotionId,
+    VoidCallback? onInterestedTap,
   }) {
     return AnimatedBuilder(
       animation: _animationController,
@@ -1113,75 +1157,107 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Panneau jaune à gauche avec image ou icône animé
-                    Container(
-                      width: 100,
-                      height: 140,
-                      decoration: BoxDecoration(
-                        gradient: imageUrl == null || imageUrl.isEmpty
-                            ? LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  _colorAnimation.value ?? const Color(0xFFFFD700),
-                                  const Color(0xFFFF6B35),
-                                ],
-                              )
-                            : null,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(20),
-                          bottomLeft: Radius.circular(20),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (_colorAnimation.value ?? const Color(0xFFFFD700))
-                                .withOpacity(_glowAnimation.value * 0.4),
-                            blurRadius: 12,
-                            spreadRadius: 2,
-                            offset: const Offset(0, 0),
+                    Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            gradient: imageUrl == null || imageUrl.isEmpty
+                                ? LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      _colorAnimation.value ?? const Color(0xFFFFD700),
+                                      const Color(0xFFFF6B35),
+                                    ],
+                                  )
+                                : null,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              bottomLeft: Radius.circular(20),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                    .withOpacity(_glowAnimation.value * 0.4),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 0),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: imageUrl != null && imageUrl.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(20),
-                                bottomLeft: Radius.circular(20),
+                          child: imageUrl != null && imageUrl.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(20),
+                                    bottomLeft: Radius.circular(20),
+                                  ),
+                                  child: Image.network(
+                                    imageUrl,
+                                    width: 100,
+                                    height: 140,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Center(
+                                        child: Icon(
+                                          Icons.local_drink,
+                                          size: 50,
+                                          color: AppColors.gray900,
+                                        ),
+                                      );
+                                    },
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Center(
+                                        child: CircularProgressIndicator(
+                                          value: loadingProgress.expectedTotalBytes != null
+                                              ? loadingProgress.cumulativeBytesLoaded /
+                                                  loadingProgress.expectedTotalBytes!
+                                              : null,
+                                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.yellowPrimary),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                )
+                              : Center(
+                                  child: Icon(
+                                    Icons.local_drink,
+                                    size: 50,
+                                    color: AppColors.gray900,
+                                  ),
+                                ),
+                        ),
+                        // Badge compteur en haut à droite
+                        if (interestedCount > 0)
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.info,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.black.withOpacity(0.2),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                              child: Image.network(
-                                imageUrl,
-                                width: 100,
-                                height: 140,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Center(
-                                    child: Icon(
-                                      Icons.local_drink,
-                                      size: 50,
-                                      color: AppColors.gray900,
-                                    ),
-                                  );
-                                },
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Center(
-                                    child: CircularProgressIndicator(
-                                      value: loadingProgress.expectedTotalBytes != null
-                                          ? loadingProgress.cumulativeBytesLoaded /
-                                              loadingProgress.expectedTotalBytes!
-                                          : null,
-                                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.yellowPrimary),
-                                    ),
-                                  );
-                                },
-                              ),
-                            )
-                          : Center(
-                              child: Icon(
-                                Icons.local_drink,
-                                size: 50,
-                                color: AppColors.gray900,
+                              child: Text(
+                                interestedCount.toString(),
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.white,
+                                ),
                               ),
                             ),
+                          ),
+                      ],
                     ),
               // Panneau blanc à droite avec contenu
               Expanded(
@@ -1362,9 +1438,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ],
                             ),
                             child: ElevatedButton(
-                              onPressed: () {
-                                // TODO: Action "Je serais là"
-                              },
+                              onPressed: onInterestedTap,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.transparent,
                                 shadowColor: Colors.transparent,
@@ -1419,6 +1493,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required double rating,
     String? imageUrl,
     String? establishmentLogoUrl,
+    int interestedCount = 0,
+    String? promotionId,
+    VoidCallback? onInterestedTap,
   }) {
     return AnimatedBuilder(
       animation: _animationController,
@@ -1547,6 +1624,34 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     fontSize: 9,
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Badge compteur en haut à gauche (ou à droite si pas actif)
+                          if (interestedCount > 0)
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.info,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.black.withOpacity(0.2),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  interestedCount.toString(),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.white,
                                   ),
                                 ),
                               ),
