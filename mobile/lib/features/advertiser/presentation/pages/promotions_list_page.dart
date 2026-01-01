@@ -5,6 +5,16 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../data/models/promotion_model.dart';
 import 'create_promotion_page.dart';
 
+/// Options de tri pour les promotions
+enum SortOption {
+  dateDesc, // Plus récent en premier (par défaut)
+  dateAsc, // Plus ancien en premier
+  stateActive, // Actives en premier
+  stateInactive, // Inactives en premier
+  periodStart, // Par date de début (plus proche en premier)
+  periodEnd, // Par date de fin (plus proche en premier)
+}
+
 /// Page displaying a list of promotions for an establishment
 class PromotionsListPage extends StatefulWidget {
   final String establishmentId;
@@ -26,7 +36,11 @@ class PromotionsListPage extends StatefulWidget {
 
 class _PromotionsListPageState extends State<PromotionsListPage> {
   List<PromotionModel> _promotions = [];
+  List<PromotionModel> _allPromotions = []; // Toutes les promotions non filtrées
   bool _isLoading = true;
+  SortOption _currentSortOption = SortOption.dateDesc;
+  DateTime? _filterStartDate;
+  DateTime? _filterEndDate;
 
   @override
   void initState() {
@@ -44,9 +58,575 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
     await Future.delayed(const Duration(milliseconds: 500));
 
     setState(() {
-      _promotions = _getMockPromotions();
+      _allPromotions = _getMockPromotions();
+      // Appliquer les filtres et le tri
+      _applyFiltersAndSort();
       _isLoading = false;
     });
+  }
+
+  /// Appliquer les filtres de dates et le tri
+  void _applyFiltersAndSort() {
+    List<PromotionModel> filtered = List.from(_allPromotions);
+    
+    // Appliquer le filtre par période de dates si défini
+    if (_filterStartDate != null || _filterEndDate != null) {
+      filtered = filtered.where((promotion) {
+        final promotionStart = promotion.startDate;
+        final promotionEnd = promotion.endDate;
+        
+        // Si une date de début est définie, vérifier que la promotion commence avant ou à cette date
+        if (_filterStartDate != null && promotionStart.isAfter(_filterStartDate!)) {
+          return false;
+        }
+        // Si une date de fin est définie, vérifier que la promotion se termine après ou à cette date
+        if (_filterEndDate != null && promotionEnd.isBefore(_filterEndDate!)) {
+          return false;
+        }
+        return true;
+      }).toList();
+    }
+    
+    // Appliquer le tri
+    _promotions = _sortPromotions(filtered, _currentSortOption);
+  }
+
+  /// Trier les promotions selon l'option sélectionnée
+  List<PromotionModel> _sortPromotions(
+    List<PromotionModel> promotions,
+    SortOption sortOption,
+  ) {
+    final sorted = List<PromotionModel>.from(promotions);
+    
+    sorted.sort((a, b) {
+      switch (sortOption) {
+        case SortOption.dateDesc:
+          // Par date de création décroissante (plus récent en premier)
+          final dateA = a.createdAt ?? a.updatedAt ?? a.startDate;
+          final dateB = b.createdAt ?? b.updatedAt ?? b.startDate;
+          return dateB.compareTo(dateA);
+          
+        case SortOption.dateAsc:
+          // Par date de création croissante (plus ancien en premier)
+          final dateA = a.createdAt ?? a.updatedAt ?? a.startDate;
+          final dateB = b.createdAt ?? b.updatedAt ?? b.startDate;
+          return dateA.compareTo(dateB);
+          
+        case SortOption.stateActive:
+          // Actives en premier, puis par date de création
+          if (a.isActive != b.isActive) {
+            return b.isActive ? 1 : -1; // Active en premier
+          }
+          final dateA = a.createdAt ?? a.updatedAt ?? a.startDate;
+          final dateB = b.createdAt ?? b.updatedAt ?? b.startDate;
+          return dateB.compareTo(dateA);
+          
+        case SortOption.stateInactive:
+          // Inactives en premier, puis par date de création
+          if (a.isActive != b.isActive) {
+            return a.isActive ? 1 : -1; // Inactive en premier
+          }
+          final dateA = a.createdAt ?? a.updatedAt ?? a.startDate;
+          final dateB = b.createdAt ?? b.updatedAt ?? b.startDate;
+          return dateB.compareTo(dateA);
+          
+        case SortOption.periodStart:
+          // Par date de début (plus proche en premier)
+          return a.startDate.compareTo(b.startDate);
+          
+        case SortOption.periodEnd:
+          // Par date de fin (plus proche en premier)
+          return a.endDate.compareTo(b.endDate);
+      }
+    });
+    
+    return sorted;
+  }
+  
+  /// Obtenir le texte à afficher pour l'option de tri
+  String _getSortOptionText(SortOption option) {
+    switch (option) {
+      case SortOption.dateDesc:
+        return 'Plus récent';
+      case SortOption.dateAsc:
+        return 'Plus ancien';
+      case SortOption.stateActive:
+        return 'Actives d\'abord';
+      case SortOption.stateInactive:
+        return 'Inactives d\'abord';
+      case SortOption.periodStart:
+        return 'Date de début';
+      case SortOption.periodEnd:
+        return 'Date de fin';
+    }
+  }
+  
+  /// Sélectionner une période de dates pour le filtrage
+  Future<void> _selectDateRange() async {
+    DateTime? startDate = _filterStartDate;
+    DateTime? endDate = _filterEndDate;
+
+    // Afficher un dialogue pour sélectionner la période
+    final result = await showDialog<Map<String, DateTime?>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+        ),
+        title: Text(
+          'Filtrer par période',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            color: AppColors.textPrimaryLight,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Date de début
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: startDate ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  locale: const Locale('fr', 'FR'),
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: ColorScheme.light(
+                          primary: AppColors.yellowPrimary,
+                          onPrimary: AppColors.textPrimaryLight,
+                          surface: AppColors.white,
+                          onSurface: AppColors.textPrimaryLight,
+                        ),
+                        dialogBackgroundColor: AppColors.white,
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null) {
+                  startDate = picked;
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    _selectDateRange();
+                  }
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundSecondaryLight,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  border: Border.all(
+                    color: AppColors.gray300,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      color: AppColors.yellowPrimary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Date de début',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            startDate != null
+                                ? '${startDate!.day}/${startDate!.month}/${startDate!.year}'
+                                : 'Sélectionner',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // Date de fin
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: endDate ?? (startDate ?? DateTime.now()),
+                  firstDate: startDate ?? DateTime(2020),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  locale: const Locale('fr', 'FR'),
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: ColorScheme.light(
+                          primary: AppColors.yellowPrimary,
+                          onPrimary: AppColors.textPrimaryLight,
+                          surface: AppColors.white,
+                          onSurface: AppColors.textPrimaryLight,
+                        ),
+                        dialogBackgroundColor: AppColors.white,
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null) {
+                  endDate = picked;
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    _selectDateRange();
+                  }
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundSecondaryLight,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                  border: Border.all(
+                    color: AppColors.gray300,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      color: AppColors.yellowPrimary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Date de fin',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            endDate != null
+                                ? '${endDate!.day}/${endDate!.month}/${endDate!.year}'
+                                : 'Sélectionner',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, {'start': null, 'end': null}),
+            child: Text(
+              'Réinitialiser',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondaryLight,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, {'start': startDate, 'end': endDate}),
+            child: Text(
+              'Appliquer',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                color: AppColors.yellowPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _filterStartDate = result['start'];
+        _filterEndDate = result['end'];
+        _applyFiltersAndSort();
+      });
+    }
+  }
+
+  /// Afficher le menu de tri et filtrage moderne
+  void _showSortMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusXLarge),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header avec grip indicator
+            Container(
+              margin: const EdgeInsets.only(top: AppSpacing.md),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.gray300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.yellowPrimary.withOpacity(0.1),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppSpacing.radiusXLarge),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.yellowPrimary,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.yellowPrimary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.tune_rounded,
+                      color: AppColors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      'Filtrer et Trier',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                        color: AppColors.textPrimaryLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Filtre par période
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Filtrer par période',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  InkWell(
+                    onTap: _selectDateRange,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: (_filterStartDate != null || _filterEndDate != null)
+                            ? AppColors.yellowPrimary.withOpacity(0.1)
+                            : AppColors.backgroundSecondaryLight,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                        border: Border.all(
+                          color: (_filterStartDate != null || _filterEndDate != null)
+                              ? AppColors.yellowPrimary.withOpacity(0.3)
+                              : AppColors.gray300,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.date_range_rounded,
+                            color: (_filterStartDate != null || _filterEndDate != null)
+                                ? AppColors.yellowPrimary
+                                : AppColors.textSecondaryLight,
+                            size: 20,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              (_filterStartDate != null || _filterEndDate != null)
+                                  ? '${_filterStartDate != null ? '${_filterStartDate!.day}/${_filterStartDate!.month}/${_filterStartDate!.year}' : 'Début'} - ${_filterEndDate != null ? '${_filterEndDate!.day}/${_filterEndDate!.month}/${_filterEndDate!.year}' : 'Fin'}'
+                                  : 'Sélectionner une période',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: (_filterStartDate != null || _filterEndDate != null)
+                                    ? AppColors.textPrimaryLight
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ),
+                          if (_filterStartDate != null || _filterEndDate != null)
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _filterStartDate = null;
+                                  _filterEndDate = null;
+                                  _applyFiltersAndSort();
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.error.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.close,
+                                  size: 16,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Options de tri
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Trier par',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: SortOption.values.map((option) {
+                      final isSelected = _currentSortOption == option;
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _currentSortOption = option;
+                            _applyFiltersAndSort();
+                          });
+                          Navigator.pop(context);
+                        },
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.yellowPrimary
+                                : AppColors.backgroundSecondaryLight,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.yellowPrimary
+                                  : AppColors.gray300,
+                              width: 1.5,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: AppColors.yellowPrimary.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isSelected)
+                                Icon(
+                                  Icons.check_circle,
+                                  size: 16,
+                                  color: AppColors.white,
+                                ),
+                              if (isSelected) const SizedBox(width: 6),
+                              Text(
+                                _getSortOptionText(option),
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected
+                                      ? AppColors.white
+                                      : AppColors.textPrimaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        ),
+      ),
+    );
   }
 
   List<PromotionModel> _getMockPromotions() {
@@ -100,12 +680,14 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
   Future<void> _toggleActive(PromotionModel promotion) async {
     // TODO: Call API to toggle active status
     setState(() {
-      _promotions = _promotions.map((p) {
+      _allPromotions = _allPromotions.map((p) {
         if (p.id == promotion.id) {
           return p.copyWith(isActive: !p.isActive);
         }
         return p;
       }).toList();
+      // Appliquer les filtres et le tri
+      _applyFiltersAndSort();
     });
 
     if (mounted) {
@@ -174,7 +756,9 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
     if (confirm == true) {
       // TODO: Call API to delete promotion
       setState(() {
-        _promotions.removeWhere((p) => p.id == promotion.id);
+        _allPromotions.removeWhere((p) => p.id == promotion.id);
+        // Appliquer les filtres et le tri
+        _applyFiltersAndSort();
       });
 
       if (mounted) {
@@ -244,7 +828,7 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
     if (confirm == true) {
       // TODO: Call API to make promotion unlimited
       setState(() {
-        _promotions = _promotions.map((p) {
+        _allPromotions = _allPromotions.map((p) {
           if (p.id == promotion.id) {
             return p.copyWith(
               isUnlimited: true,
@@ -253,6 +837,8 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
           }
           return p;
         }).toList();
+        // Appliquer les filtres et le tri
+        _applyFiltersAndSort();
       });
 
       if (mounted) {
@@ -313,11 +899,14 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final activeCount = _promotions.where((p) => p.isActive).length;
+    final totalCount = _promotions.length;
+    
     return Scaffold(
       backgroundColor: AppColors.backgroundSecondaryLight,
       appBar: AppBar(
         title: Text(
-          'Promotions',
+          'Mes promotions',
           style: GoogleFonts.inter(
             fontSize: 22,
             fontWeight: FontWeight.w800,
@@ -332,6 +921,63 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimaryLight),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sort_rounded, color: AppColors.textPrimaryLight),
+            tooltip: 'Trier',
+            onPressed: _showSortMenu,
+          ),
+        ],
+        bottom: !_isLoading && totalCount > 0
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(60),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screenHorizontal,
+                    0,
+                    AppSpacing.screenHorizontal,
+                    AppSpacing.md,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.yellowPrimary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSmall + 4),
+                          border: Border.all(
+                            color: AppColors.yellowPrimary.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.local_offer_rounded,
+                              size: 16,
+                              color: AppColors.yellowPrimary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '$activeCount active${activeCount > 1 ? 's' : ''} sur $totalCount',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : null,
       ),
       body: _isLoading
           ? Center(

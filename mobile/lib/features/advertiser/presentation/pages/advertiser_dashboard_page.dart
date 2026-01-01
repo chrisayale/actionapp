@@ -399,11 +399,11 @@ class AdvertiserDashboardPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => CreatePromotionPage(
+                      builder: (context) => PromotionsListPage(
                         establishmentId: establishment.id,
                         establishmentName: establishment.name,
+                        establishmentLogoUrl: establishment.logoUrl,
                         enseigneUrl: establishment.enseigneUrl,
-                        logoUrl: establishment.logoUrl,
                       ),
                     ),
                   );
