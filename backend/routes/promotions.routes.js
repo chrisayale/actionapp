@@ -3,9 +3,12 @@ const router = express.Router();
 const promotionsController = require('../controllers/promotions.controller');
 const { verifyToken } = require('../middleware/auth.middleware');
 
-// Public route (no authentication required)
+// Public routes (no authentication required)
 // GET /api/promotions/public - Get all active public promotions (for home page)
 router.get('/public', promotionsController.getPublicPromotions);
+
+// POST /api/promotions/:id/interested - Increment interested count (like button)
+router.post('/:id/interested', promotionsController.incrementInterested);
 
 // All other routes require authentication
 router.use(verifyToken);

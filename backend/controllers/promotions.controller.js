@@ -60,6 +60,8 @@ const createPromotion = async (req, res) => {
       boissonImageUrl,
       formule,
       imageUrl,
+      price,
+      currency,
       startDate,
       endDate,
       isUnlimited = false,
@@ -136,10 +138,13 @@ const createPromotion = async (req, res) => {
       boissonImageUrl: boissonImageUrl || null,
       formule: formule.trim(),
       imageUrl: imageUrl || null,
+      price: price != null ? (typeof price === 'number' ? price : parseFloat(price)) : null,
+      currency: currency || null,
       startDate: startDateObj,
       endDate: endDateObj,
       isActive: true,
       isUnlimited: Boolean(isUnlimited),
+      interestedCount: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -689,6 +694,59 @@ const continuePromotion = async (req, res) => {
   }
 };
 
+/**
+ * Increment interested count (like button)
+ * POST /api/promotions/:id/interested
+ * No authentication required (public)
+ */
+const incrementInterested = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the promotion
+    const promotionDoc = await db.collection('promotions').doc(id).get();
+
+    if (!promotionDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Promotion not found',
+      });
+    }
+
+    const promotionData = promotionDoc.data();
+    const currentCount = promotionData.interestedCount || 0;
+
+    // Increment the count using Firestore increment
+    await db.collection('promotions').doc(id).update({
+      interestedCount: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.Timestamp.now(),
+    });
+
+    // Get updated document
+    const updatedDoc = await db.collection('promotions').doc(id).get();
+    const updatedData = updatedDoc.data();
+
+    const responseData = {
+      id: updatedDoc.id,
+      ...convertTimestamps(updatedData),
+    };
+
+    res.json({
+      success: true,
+      promotion: responseData,
+    });
+  } catch (error) {
+    console.error('\n❌ Error incrementing interested count:');
+    console.error('   Message:', error.message);
+    console.error('   Stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to increment interested count',
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   createPromotion,
   getPublicPromotions,
@@ -698,6 +756,7 @@ module.exports = {
   deletePromotion,
   toggleActive,
   continuePromotion,
+  incrementInterested,
 };
 
 
