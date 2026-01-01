@@ -12,5 +12,6 @@ class ApiConstants {
 
   // Endpoints
   static const String advertisers = '/advertisers';
+  static const String promotions = '/promotions';
 }
 

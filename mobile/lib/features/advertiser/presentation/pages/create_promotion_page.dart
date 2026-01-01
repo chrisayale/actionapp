@@ -7,6 +7,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/services/permission_service.dart';
+import '../../data/repositories/advertiser_repository.dart';
 
 /// Model for drink/beverage
 class DrinkModel {
@@ -52,6 +53,7 @@ class CreatePromotionPage extends StatefulWidget {
 class _CreatePromotionPageState extends State<CreatePromotionPage> {
   final _formKey = GlobalKey<FormState>();
   final _formuleController = TextEditingController();
+  final AdvertiserRepository _repository = AdvertiserRepository();
 
   // Mock list of drinks - In production, this would come from API
   final List<DrinkModel> _drinks = [
@@ -410,6 +412,32 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
       return;
     }
 
+    // Drink is required
+    if (_selectedDrink == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Veuillez sélectionner une boisson',
+                  style: GoogleFonts.inter(),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+          ),
+        ),
+      );
+      return;
+    }
+
     // Image is required - either custom image or default enseigne image
     if (_promotionImageBytes == null && (_defaultImageUrl == null || _defaultImageUrl!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -466,8 +494,20 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
     });
 
     try {
-      // TODO: Implement promotion creation logic
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+      // Create promotion via repository
+      await _repository.createPromotion(
+        establishmentId: widget.establishmentId!,
+        establishmentName: widget.establishmentName!,
+        establishmentLogoUrl: widget.logoUrl,
+        boissonId: _selectedDrink!.id,
+        boissonName: _selectedDrink!.displayName,
+        boissonImageUrl: _selectedDrink!.imageUrl,
+        formule: _formuleController.text.trim(),
+        imageBytes: _promotionImageBytes,
+        imageUrl: _promotionImageBytes == null ? _defaultImageUrl : null,
+        startDate: _startDate!,
+        endDate: _endDate!,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -499,6 +539,13 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'Erreur lors de la création de la promotion';
+        if (e is Exception) {
+          errorMessage = e.toString().replaceFirst('Exception: ', '');
+        } else {
+          errorMessage = e.toString();
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -507,7 +554,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Erreur lors de la création: ${e.toString()}',
+                    errorMessage,
                     style: GoogleFonts.inter(),
                   ),
                 ),
@@ -519,6 +566,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
               borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
             ),
             margin: const EdgeInsets.all(AppSpacing.md),
+            duration: const Duration(seconds: 5),
           ),
         );
       }

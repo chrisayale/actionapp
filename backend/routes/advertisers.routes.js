@@ -23,3 +23,5 @@ router.delete('/:id', advertisersController.deleteEstablishment);
 
 module.exports = router;
 
+
+

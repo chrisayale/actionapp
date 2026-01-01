@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../models/establishment_model.dart';
+import '../models/promotion_model.dart';
 
 class AdvertiserRepository {
   final FirebaseAuth _auth = FirebaseService.auth;
@@ -520,6 +521,151 @@ class AdvertiserRepository {
         );
       }
       rethrow;
+    }
+  }
+
+  /// Create a new promotion
+  Future<PromotionModel> createPromotion({
+    required String establishmentId,
+    required String establishmentName,
+    String? establishmentLogoUrl,
+    required String boissonId,
+    required String boissonName,
+    String? boissonImageUrl,
+    required String formule,
+    Uint8List? imageBytes,
+    String? imageUrl, // Use this if imageBytes is null
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      if (kDebugMode) {
+        print('🚀 [AdvertiserRepository] Starting promotion creation...');
+      }
+
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final idToken = await _getIdToken();
+      if (idToken == null) {
+        throw Exception('Failed to get authentication token');
+      }
+
+      String? finalImageUrl = imageUrl;
+
+      // Upload image if provided
+      if (imageBytes != null) {
+        if (kDebugMode) {
+          print('📤 [AdvertiserRepository] Uploading promotion image...');
+        }
+        finalImageUrl = await _uploadImage(
+          imageBytes,
+          'promotions/${user.uid}/${establishmentId}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+        if (kDebugMode) {
+          print('✅ [AdvertiserRepository] Promotion image uploaded: $finalImageUrl');
+        }
+      }
+
+      // Create promotion via backend API
+      final apiUrl = '${ApiConstants.baseUrl}${ApiConstants.promotions}';
+      if (kDebugMode) {
+        print('🌐 [AdvertiserRepository] Sending POST request to: $apiUrl');
+      }
+
+      final requestBody = {
+        'establishmentId': establishmentId,
+        'establishmentName': establishmentName,
+        'establishmentLogoUrl': establishmentLogoUrl,
+        'boissonId': boissonId,
+        'boissonName': boissonName,
+        'boissonImageUrl': boissonImageUrl,
+        'formule': formule,
+        'imageUrl': finalImageUrl,
+        'startDate': startDate.toIso8601String(),
+        'endDate': endDate.toIso8601String(),
+      };
+
+      if (kDebugMode) {
+        print('📦 [AdvertiserRepository] Request body: ${jsonEncode(requestBody)}');
+      }
+
+      final client = http.Client();
+      try {
+        final response = await client
+            .post(
+              Uri.parse(apiUrl),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $idToken',
+              },
+              body: jsonEncode(requestBody),
+            )
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                if (kDebugMode) {
+                  print('❌ [AdvertiserRepository] Request timeout after 30 seconds');
+                }
+                throw Exception('Timeout: Le serveur ne répond pas après 30 secondes.\n\n'
+                    'Vérifiez que:\n'
+                    '1. Le backend est démarré (cd backend && npm run dev)\n'
+                    '2. Le backend écoute sur le port 3000\n'
+                    '3. L\'émulateur peut accéder au backend');
+              },
+            );
+
+        if (kDebugMode) {
+          print('📥 [AdvertiserRepository] Response received');
+          print('   Status: ${response.statusCode}');
+          print('   Body: ${response.body.substring(0, math.min(response.body.length, 500))}');
+        }
+
+        client.close();
+
+        if (response.statusCode == 201) {
+          final data = jsonDecode(response.body);
+          if (data['success'] == true) {
+            return PromotionModel.fromJson(data['promotion']);
+          } else {
+            throw Exception(data['error'] ?? 'Failed to create promotion');
+          }
+        } else {
+          final errorData = jsonDecode(response.body);
+          throw Exception(errorData['error'] ?? 'Failed to create promotion');
+        }
+      } catch (e) {
+        client.close();
+        if (kDebugMode) {
+          print('❌ [AdvertiserRepository] Connection error: $e');
+        }
+        if (e.toString().contains('Connection refused') ||
+            e.toString().contains('Failed host lookup') ||
+            e.toString().contains('SocketException') ||
+            e.toString().contains('Network is unreachable') ||
+            e.toString().contains('Timeout')) {
+          throw Exception(
+            'Impossible de se connecter au serveur.\n\n'
+            'Vérifiez que:\n'
+            '1. Le backend est démarré (cd backend && npm run dev)\n'
+            '2. Le backend écoute sur le port 3000\n'
+            '3. L\'émulateur peut accéder au backend\n\n'
+            'URL: $apiUrl\n'
+            'Erreur: $e',
+          );
+        }
+        throw e;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ [AdvertiserRepository] Unexpected error: $e');
+      }
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Erreur inattendue: $e');
     }
   }
 }
