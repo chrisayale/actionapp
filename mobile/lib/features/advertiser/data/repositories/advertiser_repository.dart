@@ -26,6 +26,84 @@ class AdvertiserRepository {
     }
   }
 
+  /// Get promotions for a specific establishment
+  /// GET /api/promotions?establishmentId=xxx
+  Future<List<PromotionModel>> getPromotionsForEstablishment(String establishmentId) async {
+    try {
+      if (kDebugMode) {
+        print('📋 [AdvertiserRepository] Fetching promotions for establishment: $establishmentId');
+      }
+
+      final idToken = await _getIdToken();
+      if (idToken == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final apiUrl = '${ApiConstants.baseUrl}${ApiConstants.promotions}?establishmentId=$establishmentId';
+      if (kDebugMode) {
+        print('🌐 [AdvertiserRepository] GET request to: $apiUrl');
+      }
+
+      final client = http.Client();
+      try {
+        final response = await client
+            .get(
+              Uri.parse(apiUrl),
+              headers: {
+                'Authorization': 'Bearer $idToken',
+              },
+            )
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                if (kDebugMode) {
+                  print('❌ [AdvertiserRepository] Request timeout after 30 seconds');
+                }
+                throw Exception('Timeout: Le serveur ne répond pas après 30 secondes.');
+              },
+            );
+
+        if (kDebugMode) {
+          print('📥 [AdvertiserRepository] Response received');
+          print('   Status: ${response.statusCode}');
+        }
+
+        client.close();
+
+        if (response.statusCode == 200) {
+          final responseData = jsonDecode(response.body) as Map<String, dynamic>;
+
+          if (responseData['success'] == true && responseData['promotions'] != null) {
+            final promotionsList = responseData['promotions'] as List<dynamic>;
+            final promotions = promotionsList
+                .map((promoJson) => PromotionModel.fromJson(promoJson as Map<String, dynamic>))
+                .toList();
+
+            if (kDebugMode) {
+              print('✅ [AdvertiserRepository] Successfully fetched ${promotions.length} promotions');
+            }
+
+            return promotions;
+          } else {
+            throw Exception('Invalid response format: ${response.body}');
+          }
+        } else {
+          final errorData = jsonDecode(response.body) as Map<String, dynamic>;
+          final errorMessage = errorData['error'] as String? ?? 'Failed to fetch promotions';
+          throw Exception(errorMessage);
+        }
+      } catch (e) {
+        client.close();
+        rethrow;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ [AdvertiserRepository] Error fetching promotions: $e');
+      }
+      rethrow;
+    }
+  }
+
   /// Get all public active promotions (no authentication required)
   /// GET /api/promotions/public
   Future<List<PromotionModel>> getPublicPromotions() async {

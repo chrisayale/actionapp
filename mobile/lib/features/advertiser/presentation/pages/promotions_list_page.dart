@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../data/models/promotion_model.dart';
+import '../../data/repositories/advertiser_repository.dart';
 import 'create_promotion_page.dart';
 
 /// Options de tri pour les promotions
@@ -41,6 +42,7 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
   SortOption _currentSortOption = SortOption.dateDesc;
   DateTime? _filterStartDate;
   DateTime? _filterEndDate;
+  final AdvertiserRepository _repository = AdvertiserRepository();
 
   @override
   void initState() {
@@ -53,16 +55,29 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
       _isLoading = true;
     });
 
-    // TODO: Load promotions from API/Repository
-    // For now, using mock data
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    setState(() {
-      _allPromotions = _getMockPromotions();
-      // Appliquer les filtres et le tri
-      _applyFiltersAndSort();
-      _isLoading = false;
-    });
+    try {
+      final promotions = await _repository.getPromotionsForEstablishment(widget.establishmentId);
+      if (mounted) {
+        setState(() {
+          _allPromotions = promotions;
+          // Appliquer les filtres et le tri
+          _applyFiltersAndSort();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors du chargement des promotions: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   /// Appliquer les filtres de dates et le tri
@@ -1097,6 +1112,19 @@ class _PromotionListItem extends StatelessWidget {
     return '$formattedPrice ${promotion.currency ?? ''}';
   }
 
+  /// Format view count (e.g., 1000 -> "1K", 1500 -> "1.5K")
+  String _formatCount(int count) {
+    if (count < 1000) {
+      return count.toString();
+    } else if (count < 1000000) {
+      final k = count / 1000;
+      return k % 1 == 0 ? '${k.toInt()}K' : '${k.toStringAsFixed(1)}K';
+    } else {
+      final m = count / 1000000;
+      return m % 1 == 0 ? '${m.toInt()}M' : '${m.toStringAsFixed(1)}M';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isExpired = !promotion.isUnlimited && promotion.endDate.isBefore(DateTime.now());
@@ -1133,23 +1161,36 @@ class _PromotionListItem extends StatelessWidget {
                         width: 1,
                       ),
                     ),
-                    child: promotion.imageUrl != null && promotion.imageUrl!.isNotEmpty
+                    child: promotion.boissonImageUrl != null && promotion.boissonImageUrl!.isNotEmpty
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
                             child: Image.network(
-                              promotion.imageUrl!,
+                              promotion.boissonImageUrl!,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Icon(
-                                  Icons.local_offer_rounded,
+                                  Icons.local_drink_rounded,
                                   color: AppColors.yellowPrimary,
                                   size: 32,
+                                );
+                              },
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Center(
+                                  child: CircularProgressIndicator(
+                                    value: loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                        : null,
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.yellowPrimary),
+                                  ),
                                 );
                               },
                             ),
                           )
                         : Icon(
-                            Icons.local_offer_rounded,
+                            Icons.local_drink_rounded,
                             color: AppColors.yellowPrimary,
                             size: 32,
                           ),
@@ -1274,14 +1315,63 @@ class _PromotionListItem extends StatelessWidget {
                               color: AppColors.textTertiaryLight,
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              promotion.isUnlimited
-                                  ? 'Sans date d\'expiration'
-                                  : '${formatDate(promotion.startDate)} - ${formatDate(promotion.endDate)}',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: AppColors.textTertiaryLight,
+                            Expanded(
+                              child: Text(
+                                promotion.isUnlimited
+                                    ? 'Sans date d\'expiration'
+                                    : '${formatDate(promotion.startDate)} - ${formatDate(promotion.endDate)}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: AppColors.textTertiaryLight,
+                                ),
                               ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        // Statistiques: Vues et "Je serais là"
+                        Row(
+                          children: [
+                            // Nombre de vues
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.visibility_rounded,
+                                  size: 14,
+                                  color: AppColors.info,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatCount(promotion.viewCount),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.info,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            // Nombre de "Je serais là"
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.favorite_rounded,
+                                  size: 14,
+                                  color: AppColors.error,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatCount(promotion.interestedCount),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.error,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
