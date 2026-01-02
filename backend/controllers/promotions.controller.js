@@ -263,13 +263,43 @@ const getPublicPromotions = async (req, res) => {
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA; // Descending order
       });
+
+    // Enrich promotions with establishment location data
+    const enrichedPromotions = await Promise.all(
+      promotions.map(async (promotion) => {
+        try {
+          const establishmentDoc = await db.collection('establishments').doc(promotion.establishmentId).get();
+          if (establishmentDoc.exists) {
+            const establishmentData = establishmentDoc.data();
+            const location = establishmentData.location || {};
+            return {
+              ...promotion,
+              location: {
+                ville: location.ville || null,
+                quartier: location.quartier || null,
+                avenue: location.avenue || null,
+                numero: location.numero || null,
+                latitude: location.latitude || null,
+                longitude: location.longitude || null,
+              },
+            };
+          }
+        } catch (error) {
+          console.error(`Error fetching establishment ${promotion.establishmentId}:`, error);
+        }
+        return {
+          ...promotion,
+          location: null,
+        };
+      })
+    );
     
-    console.log(`✅ Found ${promotions.length} public active promotions`);
+    console.log(`✅ Found ${enrichedPromotions.length} public active promotions`);
     
     res.json({
       success: true,
-      promotions,
-      count: promotions.length,
+      promotions: enrichedPromotions,
+      count: enrichedPromotions.length,
     });
   } catch (error) {
     console.error('\n❌ Error getting public promotions:');
