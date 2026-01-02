@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../auth/auth_controller.dart';
 import '../../../../core/routes/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -10,6 +11,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../advertiser/data/models/promotion_model.dart';
 import '../../../advertiser/data/repositories/advertiser_repository.dart';
+import 'promotion_detail_page.dart';
 
 class HomePage extends StatefulWidget {
   final AuthController authController;
@@ -1052,10 +1054,69 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
+  /// Format location string (ville, quartier/commune, avenue, numero)
+  String _formatLocation(PromotionLocation location) {
+    final parts = <String>[];
+    if (location.ville != null && location.ville!.isNotEmpty) {
+      parts.add(location.ville!);
+    }
+    if (location.quartier != null && location.quartier!.isNotEmpty) {
+      parts.add(location.quartier!);
+    }
+    if (location.avenue != null && location.avenue!.isNotEmpty) {
+      parts.add(location.avenue!);
+    }
+    if (location.numero != null && location.numero!.isNotEmpty) {
+      parts.add(location.numero!);
+    }
+    return parts.isNotEmpty ? parts.join(', ') : 'Kinshasa';
+  }
+
+  /// Open maps with directions to the location
+  Future<void> _openMaps(PromotionLocation? location) async {
+    if (location == null || location.latitude == null || location.longitude == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Localisation non disponible'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Create Google Maps URL with directions
+    final url = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}',
+    );
+
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Impossible d\'ouvrir Google Maps';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ouverture de la carte: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildPromotionCard(PromotionModel promotion) {
+    final locationText = promotion.location != null
+        ? _formatLocation(promotion.location!)
+        : 'Kinshasa';
+    
     return _buildEstablishmentCard(
       name: promotion.establishmentName,
-      location: 'Kinshasa',
+      location: locationText,
       offer: promotion.boissonName,
       promotion: promotion.formule,
       price: _formatPrice(promotion),
@@ -1067,7 +1128,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       interestedCount: promotion.interestedCount,
       viewCount: promotion.viewCount,
       promotionId: promotion.id,
+      promotionLocation: promotion.location,
       onInterestedTap: () => _toggleInterestedCount(promotion),
+      onLocationTap: () => _openMaps(promotion.location),
+      onViewMoreTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PromotionDetailPage(promotion: promotion),
+          ),
+        );
+      },
     );
   }
   
@@ -1093,9 +1164,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
   
   Widget _buildPromotionGridCard(PromotionModel promotion) {
+    final locationText = promotion.location != null
+        ? _formatLocation(promotion.location!)
+        : 'Kinshasa';
+    
     return _buildEstablishmentGridCard(
       name: promotion.establishmentName,
-      location: 'Kinshasa',
+      location: locationText,
       offer: promotion.boissonName,
       promotion: promotion.formule,
       price: _formatPrice(promotion),
@@ -1107,7 +1182,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       interestedCount: promotion.interestedCount,
       viewCount: promotion.viewCount,
       promotionId: promotion.id,
+      promotionLocation: promotion.location,
       onInterestedTap: () => _toggleInterestedCount(promotion),
+      onLocationTap: () => _openMaps(promotion.location),
     );
   }
 
@@ -1125,7 +1202,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     int interestedCount = 0,
     int viewCount = 0,
     String? promotionId,
+    PromotionLocation? promotionLocation,
     VoidCallback? onInterestedTap,
+    VoidCallback? onLocationTap,
+    VoidCallback? onViewMoreTap,
   }) {
     return AnimatedBuilder(
       animation: _animationController,
@@ -1328,23 +1408,77 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm + 2),
-                      // Localisation et nombre de vues
+                      // Localisation cliquable et nombre de vues
                       Row(
                         children: [
-                          const Icon(Icons.location_on, size: 16, color: AppColors.gray500),
-                          const SizedBox(width: 6),
                           Expanded(
-                            child: Text(
-                              location,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: AppColors.gray700,
-                                fontWeight: FontWeight.w500,
+                            child: GestureDetector(
+                              onTap: onLocationTap,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.location_on, size: 16, color: AppColors.gray500),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (promotionLocation != null) ...[
+                                          if (promotionLocation.ville != null && promotionLocation.ville!.isNotEmpty)
+                                            Text(
+                                              promotionLocation.ville!,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 13,
+                                                color: AppColors.gray700,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          if (promotionLocation.quartier != null && promotionLocation.quartier!.isNotEmpty)
+                                            Text(
+                                              promotionLocation.quartier!,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 12,
+                                                color: AppColors.gray600,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          if (promotionLocation.avenue != null && promotionLocation.avenue!.isNotEmpty)
+                                            Text(
+                                              promotionLocation.avenue!,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11,
+                                                color: AppColors.gray600,
+                                              ),
+                                            ),
+                                          if (promotionLocation.numero != null && promotionLocation.numero!.isNotEmpty)
+                                            Text(
+                                              'N° ${promotionLocation.numero!}',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 11,
+                                                color: AppColors.gray600,
+                                              ),
+                                            ),
+                                        ] else
+                                          Text(
+                                            location,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 13,
+                                              color: AppColors.gray700,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.directions, size: 16, color: AppColors.info),
+                                ],
                               ),
                             ),
                           ),
                           // Nombre de vues
                           if (viewCount > 0) ...[
+                            const SizedBox(width: 8),
                             const Icon(Icons.visibility, size: 14, color: AppColors.textSecondaryLight),
                             const SizedBox(width: 4),
                             Text(
@@ -1429,9 +1563,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           // Bouton "Voir plus..."
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () {
-                                // TODO: Voir plus de détails
-                              },
+                              onPressed: onViewMoreTap,
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(color: Color(0xFF2196F3), width: 1.5),
                                 shape: RoundedRectangleBorder(
@@ -1537,7 +1669,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     int interestedCount = 0,
     int viewCount = 0,
     String? promotionId,
+    PromotionLocation? promotionLocation,
     VoidCallback? onInterestedTap,
+    VoidCallback? onLocationTap,
+    VoidCallback? onViewMoreTap,
   }) {
     return AnimatedBuilder(
       animation: _animationController,
@@ -1732,23 +1867,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
-                          // Localisation
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on, size: 12, color: AppColors.gray500),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  location,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    color: AppColors.textSecondaryLight,
+                          // Localisation cliquable
+                          GestureDetector(
+                            onTap: onLocationTap,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.location_on, size: 12, color: AppColors.gray500),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    promotionLocation != null
+                                        ? (promotionLocation.ville ?? location)
+                                        : location,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      color: AppColors.textSecondaryLight,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                const Icon(Icons.directions, size: 12, color: AppColors.info),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 6),
                           // Promotion et prix

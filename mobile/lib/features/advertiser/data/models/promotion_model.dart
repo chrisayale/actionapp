@@ -1,3 +1,55 @@
+/// Model for location information
+class PromotionLocation {
+  final String? ville;
+  final String? quartier;
+  final String? avenue;
+  final String? numero;
+  final double? latitude;
+  final double? longitude;
+
+  PromotionLocation({
+    this.ville,
+    this.quartier,
+    this.avenue,
+    this.numero,
+    this.latitude,
+    this.longitude,
+  });
+
+  factory PromotionLocation.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return PromotionLocation();
+    return PromotionLocation(
+      ville: json['ville'] as String?,
+      quartier: json['quartier'] as String?,
+      avenue: json['avenue'] as String?,
+      numero: json['numero'] as String?,
+      latitude: json['latitude'] != null ? (json['latitude'] is num ? (json['latitude'] as num).toDouble() : double.tryParse(json['latitude'].toString())) : null,
+      longitude: json['longitude'] != null ? (json['longitude'] is num ? (json['longitude'] as num).toDouble() : double.tryParse(json['longitude'].toString())) : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'ville': ville,
+      'quartier': quartier,
+      'avenue': avenue,
+      'numero': numero,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+  }
+
+  /// Get formatted address string
+  String get formattedAddress {
+    final parts = <String>[];
+    if (numero != null && numero!.isNotEmpty) parts.add(numero!);
+    if (avenue != null && avenue!.isNotEmpty) parts.add(avenue!);
+    if (quartier != null && quartier!.isNotEmpty) parts.add(quartier!);
+    if (ville != null && ville!.isNotEmpty) parts.add(ville!);
+    return parts.join(', ');
+  }
+}
+
 /// Model for representing a promotion
 class PromotionModel {
   final String id;
@@ -17,6 +69,7 @@ class PromotionModel {
   final bool isUnlimited; // Promotion sans limite (continuée)
   final int interestedCount; // Nombre de personnes intéressées (comme "J'aime")
   final int viewCount; // Nombre de vues de la promotion
+  final PromotionLocation? location; // Informations de localisation de l'établissement
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -38,6 +91,7 @@ class PromotionModel {
     this.isUnlimited = false,
     this.interestedCount = 0,
     this.viewCount = 0,
+    this.location,
     this.createdAt,
     this.updatedAt,
   });
@@ -83,6 +137,7 @@ class PromotionModel {
       isUnlimited: json['isUnlimited'] as bool? ?? false,
       interestedCount: json['interestedCount'] != null ? (json['interestedCount'] is int ? json['interestedCount'] as int : int.tryParse(json['interestedCount'].toString()) ?? 0) : 0,
       viewCount: json['viewCount'] != null ? (json['viewCount'] is int ? json['viewCount'] as int : int.tryParse(json['viewCount'].toString()) ?? 0) : 0,
+      location: json['location'] != null ? PromotionLocation.fromJson(json['location'] as Map<String, dynamic>?) : null,
       createdAt: json['createdAt'] != null
           ? (json['createdAt'] is DateTime
               ? json['createdAt'] as DateTime
@@ -129,6 +184,7 @@ class PromotionModel {
       'isUnlimited': isUnlimited,
       'interestedCount': interestedCount,
       'viewCount': viewCount,
+      'location': location?.toJson(),
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
@@ -152,6 +208,7 @@ class PromotionModel {
     bool? isUnlimited,
     int? interestedCount,
     int? viewCount,
+    PromotionLocation? location,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -173,6 +230,7 @@ class PromotionModel {
       isUnlimited: isUnlimited ?? this.isUnlimited,
       interestedCount: interestedCount ?? this.interestedCount,
       viewCount: viewCount ?? this.viewCount,
+      location: location ?? this.location,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
