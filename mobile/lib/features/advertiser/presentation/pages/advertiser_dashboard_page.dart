@@ -5,6 +5,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../data/models/establishment_model.dart';
 import 'create_promotion_page.dart';
 import 'promotions_list_page.dart';
+import 'subscription_page.dart';
 
 /// Professional dashboard screen for managing advertiser establishment
 /// Displays KPIs, promotions, subscriptions, and advertiser profile
@@ -908,24 +909,16 @@ class AdvertiserDashboardPage extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      // TODO: Navigate to plans
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Voir les plans',
-                            style: GoogleFonts.inter(),
-                          ),
-                          backgroundColor: AppColors.info,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-                          ),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SubscriptionPage(),
                         ),
                       );
                     },
-                    icon: const Icon(Icons.info_outline_rounded, size: 18),
+                    icon: const Icon(Icons.card_membership_rounded, size: 18),
                     label: Text(
-                      'Plans',
+                      'Abonnez-vous',
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
