@@ -145,6 +145,8 @@ const createPromotion = async (req, res) => {
       isActive: true,
       isUnlimited: Boolean(isUnlimited),
       interestedCount: 0,
+      interestedUsers: [], // Array of user IDs who clicked "Je serais là"
+      viewCount: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -695,13 +697,14 @@ const continuePromotion = async (req, res) => {
 };
 
 /**
- * Increment interested count (like button)
+ * Toggle interested count (like button - toggle behavior)
  * POST /api/promotions/:id/interested
- * No authentication required (public)
+ * Authentication required
  */
-const incrementInterested = async (req, res) => {
+const toggleInterested = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.uid;
 
     // Get the promotion
     const promotionDoc = await db.collection('promotions').doc(id).get();
@@ -714,13 +717,24 @@ const incrementInterested = async (req, res) => {
     }
 
     const promotionData = promotionDoc.data();
-    const currentCount = promotionData.interestedCount || 0;
+    const interestedUsers = promotionData.interestedUsers || [];
+    const isInterested = interestedUsers.includes(userId);
 
-    // Increment the count using Firestore increment
-    await db.collection('promotions').doc(id).update({
-      interestedCount: admin.firestore.FieldValue.increment(1),
+    let updateData = {
       updatedAt: admin.firestore.Timestamp.now(),
-    });
+    };
+
+    if (isInterested) {
+      // User already interested: remove and decrement
+      updateData.interestedUsers = admin.firestore.FieldValue.arrayRemove(userId);
+      updateData.interestedCount = admin.firestore.FieldValue.increment(-1);
+    } else {
+      // User not interested: add and increment
+      updateData.interestedUsers = admin.firestore.FieldValue.arrayUnion(userId);
+      updateData.interestedCount = admin.firestore.FieldValue.increment(1);
+    }
+
+    await db.collection('promotions').doc(id).update(updateData);
 
     // Get updated document
     const updatedDoc = await db.collection('promotions').doc(id).get();
@@ -729,6 +743,7 @@ const incrementInterested = async (req, res) => {
     const responseData = {
       id: updatedDoc.id,
       ...convertTimestamps(updatedData),
+      isInterested: !isInterested, // Return new state
     };
 
     res.json({
@@ -736,12 +751,12 @@ const incrementInterested = async (req, res) => {
       promotion: responseData,
     });
   } catch (error) {
-    console.error('\n❌ Error incrementing interested count:');
+    console.error('\n❌ Error toggling interested count:');
     console.error('   Message:', error.message);
     console.error('   Stack:', error.stack);
     res.status(500).json({
       success: false,
-      error: 'Failed to increment interested count',
+      error: 'Failed to toggle interested count',
       message: error.message,
     });
   }
@@ -756,7 +771,7 @@ module.exports = {
   deletePromotion,
   toggleActive,
   continuePromotion,
-  incrementInterested,
+  toggleInterested,
 };
 
 

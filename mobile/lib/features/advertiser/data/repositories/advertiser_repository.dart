@@ -743,12 +743,22 @@ class AdvertiserRepository {
     }
   }
 
-  /// Increment interested count (like button) - Public endpoint (no auth required)
+  /// Toggle interested count (like button - toggle behavior) - Requires authentication
   /// POST /api/promotions/:id/interested
-  Future<PromotionModel> incrementInterestedCount(String promotionId) async {
+  Future<PromotionModel> toggleInterestedCount(String promotionId) async {
     try {
       if (kDebugMode) {
-        print('👍 [AdvertiserRepository] Incrementing interested count for promotion: $promotionId');
+        print('👍 [AdvertiserRepository] Toggling interested count for promotion: $promotionId');
+      }
+
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final idToken = await _getIdToken();
+      if (idToken == null) {
+        throw Exception('Failed to get authentication token');
       }
 
       final apiUrl = '${ApiConstants.baseUrl}${ApiConstants.promotions}/$promotionId/interested';
@@ -759,7 +769,13 @@ class AdvertiserRepository {
       final client = http.Client();
       try {
         final response = await client
-            .post(Uri.parse(apiUrl))
+            .post(
+              Uri.parse(apiUrl),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $idToken',
+              },
+            )
             .timeout(
               const Duration(seconds: 30),
               onTimeout: () {
@@ -782,20 +798,20 @@ class AdvertiserRepository {
           if (data['success'] == true && data['promotion'] != null) {
             final promotion = PromotionModel.fromJson(data['promotion'] as Map<String, dynamic>);
             if (kDebugMode) {
-              print('✅ [AdvertiserRepository] Interested count incremented. New count: ${promotion.interestedCount}');
+              print('✅ [AdvertiserRepository] Interested count toggled. New count: ${promotion.interestedCount}');
             }
             return promotion;
           } else {
-            throw Exception(data['error'] ?? 'Failed to increment interested count');
+            throw Exception(data['error'] ?? 'Failed to toggle interested count');
           }
         } else {
           final errorData = jsonDecode(response.body);
-          throw Exception(errorData['error'] ?? 'Failed to increment interested count');
+          throw Exception(errorData['error'] ?? 'Failed to toggle interested count');
         }
       } catch (e) {
         client.close();
         if (kDebugMode) {
-          print('❌ [AdvertiserRepository] Error incrementing interested count: $e');
+          print('❌ [AdvertiserRepository] Error toggling interested count: $e');
         }
         rethrow;
       }

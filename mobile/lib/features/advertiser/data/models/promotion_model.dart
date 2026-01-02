@@ -16,6 +16,7 @@ class PromotionModel {
   final bool isActive;
   final bool isUnlimited; // Promotion sans limite (continuée)
   final int interestedCount; // Nombre de personnes intéressées (comme "J'aime")
+  final int viewCount; // Nombre de vues de la promotion
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -36,6 +37,7 @@ class PromotionModel {
     required this.isActive,
     this.isUnlimited = false,
     this.interestedCount = 0,
+    this.viewCount = 0,
     this.createdAt,
     this.updatedAt,
   });
@@ -80,6 +82,7 @@ class PromotionModel {
       isActive: json['isActive'] as bool? ?? true,
       isUnlimited: json['isUnlimited'] as bool? ?? false,
       interestedCount: json['interestedCount'] != null ? (json['interestedCount'] is int ? json['interestedCount'] as int : int.tryParse(json['interestedCount'].toString()) ?? 0) : 0,
+      viewCount: json['viewCount'] != null ? (json['viewCount'] is int ? json['viewCount'] as int : int.tryParse(json['viewCount'].toString()) ?? 0) : 0,
       createdAt: json['createdAt'] != null
           ? (json['createdAt'] is DateTime
               ? json['createdAt'] as DateTime
@@ -125,6 +128,7 @@ class PromotionModel {
       'isActive': isActive,
       'isUnlimited': isUnlimited,
       'interestedCount': interestedCount,
+      'viewCount': viewCount,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
@@ -147,6 +151,7 @@ class PromotionModel {
     bool? isActive,
     bool? isUnlimited,
     int? interestedCount,
+    int? viewCount,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -167,6 +172,7 @@ class PromotionModel {
       isActive: isActive ?? this.isActive,
       isUnlimited: isUnlimited ?? this.isUnlimited,
       interestedCount: interestedCount ?? this.interestedCount,
+      viewCount: viewCount ?? this.viewCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

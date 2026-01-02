@@ -159,9 +159,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
-  Future<void> _incrementInterestedCount(PromotionModel promotion) async {
+  Future<void> _toggleInterestedCount(PromotionModel promotion) async {
     try {
-      final updatedPromotion = await _repository.incrementInterestedCount(promotion.id);
+      final updatedPromotion = await _repository.toggleInterestedCount(promotion.id);
       if (mounted) {
         setState(() {
           final index = _promotions.indexWhere((p) => p.id == promotion.id);
@@ -174,7 +174,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de l\'incrémentation: $e'),
+            content: Text('Erreur lors de l\'action: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1039,6 +1039,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return '${formattedPrice} ${promotion.currency ?? ''}';
   }
 
+  /// Format view count (e.g., 1000 -> "1K", 1500 -> "1.5K")
+  String _formatViewCount(int count) {
+    if (count < 1000) {
+      return count.toString();
+    } else if (count < 1000000) {
+      final k = count / 1000;
+      return k % 1 == 0 ? '${k.toInt()}K' : '${k.toStringAsFixed(1)}K';
+    } else {
+      final m = count / 1000000;
+      return m % 1 == 0 ? '${m.toInt()}M' : '${m.toStringAsFixed(1)}M';
+    }
+  }
+
   Widget _buildPromotionCard(PromotionModel promotion) {
     return _buildEstablishmentCard(
       name: promotion.establishmentName,
@@ -1052,8 +1065,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       imageUrl: promotion.boissonImageUrl, // Utiliser l'image de la boisson
       establishmentLogoUrl: promotion.establishmentLogoUrl,
       interestedCount: promotion.interestedCount,
+      viewCount: promotion.viewCount,
       promotionId: promotion.id,
-      onInterestedTap: () => _incrementInterestedCount(promotion),
+      onInterestedTap: () => _toggleInterestedCount(promotion),
     );
   }
   
@@ -1091,8 +1105,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       imageUrl: promotion.boissonImageUrl, // Utiliser l'image de la boisson
       establishmentLogoUrl: promotion.establishmentLogoUrl,
       interestedCount: promotion.interestedCount,
+      viewCount: promotion.viewCount,
       promotionId: promotion.id,
-      onInterestedTap: () => _incrementInterestedCount(promotion),
+      onInterestedTap: () => _toggleInterestedCount(promotion),
     );
   }
 
@@ -1108,6 +1123,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     String? imageUrl,
     String? establishmentLogoUrl,
     int interestedCount = 0,
+    int viewCount = 0,
     String? promotionId,
     VoidCallback? onInterestedTap,
   }) {
@@ -1281,26 +1297,38 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ),
                             ),
                           ),
-                          if (isActive)
+                          // Nombre de vues (remplace le badge Actif)
+                          if (viewCount > 0)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm + 2, vertical: AppSpacing.xs + 1),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFD700),
                                 borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
                               ),
-                              child: Text(
-                                'Actif',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimaryLight,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.visibility,
+                                    size: 12,
+                                    color: AppColors.textPrimaryLight,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatViewCount(viewCount),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimaryLight,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm + 2),
-                      // Localisation
+                      // Localisation et nombre de vues
                       Row(
                         children: [
                           const Icon(Icons.location_on, size: 16, color: AppColors.gray500),
@@ -1315,6 +1343,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ),
                             ),
                           ),
+                          // Nombre de vues
+                          if (viewCount > 0) ...[
+                            const Icon(Icons.visibility, size: 14, color: AppColors.textSecondaryLight),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatViewCount(viewCount),
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: AppColors.textSecondaryLight,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: AppSpacing.md),
@@ -1494,6 +1535,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     String? imageUrl,
     String? establishmentLogoUrl,
     int interestedCount = 0,
+    int viewCount = 0,
     String? promotionId,
     VoidCallback? onInterestedTap,
   }) {
@@ -1608,7 +1650,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 color: AppColors.gray900,
                               ),
                             ),
-                          if (isActive)
+                          // Nombre de vues (remplace le badge Actif)
+                          if (viewCount > 0)
                             Positioned(
                               top: 8,
                               right: 8,
@@ -1618,13 +1661,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                   color: const Color(0xFFFFD700),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: Text(
-                                  'Actif',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimaryLight,
-                                  ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.visibility,
+                                      size: 10,
+                                      color: AppColors.textPrimaryLight,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      _formatViewCount(viewCount),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimaryLight,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -1729,7 +1783,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             ],
                           ),
                           const SizedBox(height: 6),
-                          // Distance et rating
+                          // Distance, rating et vues
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -1747,12 +1801,28 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                   ),
                                 ],
                               ),
-                              Text(
-                                distance,
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  color: AppColors.textSecondaryLight,
-                                ),
+                              Row(
+                                children: [
+                                  if (viewCount > 0) ...[
+                                    const Icon(Icons.visibility, size: 12, color: AppColors.textSecondaryLight),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _formatViewCount(viewCount),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        color: AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  Text(
+                                    distance,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      color: AppColors.textSecondaryLight,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

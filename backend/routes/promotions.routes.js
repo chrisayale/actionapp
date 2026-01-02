@@ -7,11 +7,11 @@ const { verifyToken } = require('../middleware/auth.middleware');
 // GET /api/promotions/public - Get all active public promotions (for home page)
 router.get('/public', promotionsController.getPublicPromotions);
 
-// POST /api/promotions/:id/interested - Increment interested count (like button)
-router.post('/:id/interested', promotionsController.incrementInterested);
-
 // All other routes require authentication
 router.use(verifyToken);
+
+// POST /api/promotions/:id/interested - Toggle interested count (like button - requires auth)
+router.post('/:id/interested', promotionsController.toggleInterested);
 
 // POST /api/promotions - Create a new promotion
 router.post('/', promotionsController.createPromotion);
