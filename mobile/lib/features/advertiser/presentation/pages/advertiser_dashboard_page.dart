@@ -923,15 +923,17 @@ class AdvertiserDashboardPage extends StatelessWidget {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.card_membership_rounded, size: 18),
+                    icon: const Icon(Icons.card_membership_rounded, size: 18, color: AppColors.textPrimaryLight),
                     label: Text(
                       'Abonnez-vous',
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
+                        color: AppColors.textPrimaryLight,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textPrimaryLight,
                       side: const BorderSide(color: AppColors.gray300, width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 4),
                       shape: RoundedRectangleBorder(

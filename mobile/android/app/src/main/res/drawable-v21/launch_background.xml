@@ -1,8 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Background color of the splash screen (yellow theme) -->
-    <item android:drawable="@color/splash_background" />
+    <!-- Semi-transparent white background for better logo visibility -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#CCFFFFFF" />
+        </shape>
+    </item>
+
+    <!-- White circle background behind logo for better visibility -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFF" />
+            <size
+                android:width="200dp"
+                android:height="200dp" />
+        </shape>
+    </item>
 
     <!-- Centered app logo on splash screen -->
     <item>

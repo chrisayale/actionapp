@@ -4,14 +4,38 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../advertiser/data/models/promotion_model.dart';
+import '../../../advertiser/data/repositories/advertiser_repository.dart';
 
-class PromotionDetailPage extends StatelessWidget {
+class PromotionDetailPage extends StatefulWidget {
   final PromotionModel promotion;
 
   const PromotionDetailPage({
     super.key,
     required this.promotion,
   });
+
+  @override
+  State<PromotionDetailPage> createState() => _PromotionDetailPageState();
+}
+
+class _PromotionDetailPageState extends State<PromotionDetailPage> {
+  final AdvertiserRepository _repository = AdvertiserRepository();
+  bool _hasIncrementedView = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Incrémenter le compteur de vues quand la page est ouverte
+    _incrementViewCount();
+  }
+
+  Future<void> _incrementViewCount() async {
+    // Ne pas incrémenter plusieurs fois si la page est reconstruite
+    if (!_hasIncrementedView) {
+      _hasIncrementedView = true;
+      await _repository.incrementViewCount(widget.promotion.id);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,11 +94,11 @@ class PromotionDetailPage extends StatelessWidget {
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: promotion.boissonImageUrl != null && promotion.boissonImageUrl!.isNotEmpty
+                          child: widget.promotion.boissonImageUrl != null && widget.promotion.boissonImageUrl!.isNotEmpty
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
                                   child: Image.network(
-                                    promotion.boissonImageUrl!,
+                                    widget.promotion.boissonImageUrl!,
                                     fit: BoxFit.contain,
                                     errorBuilder: (context, error, stackTrace) {
                                       return Container(
@@ -122,7 +146,7 @@ class PromotionDetailPage extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Text(
-                            promotion.boissonName,
+                            widget.promotion.boissonName,
                             textAlign: TextAlign.center,
                             style: GoogleFonts.inter(
                               fontSize: 24,
@@ -189,11 +213,11 @@ class PromotionDetailPage extends StatelessWidget {
                         color: Colors.white.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: promotion.establishmentLogoUrl != null && promotion.establishmentLogoUrl!.isNotEmpty
+                      child: widget.promotion.establishmentLogoUrl != null && widget.promotion.establishmentLogoUrl!.isNotEmpty
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: Image.network(
-                                promotion.establishmentLogoUrl!,
+                                widget.promotion.establishmentLogoUrl!,
                                 fit: BoxFit.contain,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
@@ -259,11 +283,11 @@ class PromotionDetailPage extends StatelessWidget {
                       // Header avec nom de l'établissement et logo
                       Row(
                         children: [
-                          if (promotion.establishmentLogoUrl != null && promotion.establishmentLogoUrl!.isNotEmpty)
+                          if (widget.promotion.establishmentLogoUrl != null && widget.promotion.establishmentLogoUrl!.isNotEmpty)
                             ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: Image.network(
-                                promotion.establishmentLogoUrl!,
+                                widget.promotion.establishmentLogoUrl!,
                                 width: 60,
                                 height: 60,
                                 fit: BoxFit.cover,
@@ -302,7 +326,7 @@ class PromotionDetailPage extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  promotion.establishmentName,
+                                  widget.promotion.establishmentName,
                                   style: GoogleFonts.inter(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
@@ -320,9 +344,9 @@ class PromotionDetailPage extends StatelessWidget {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: promotion.isUnlimited
+                                        color: widget.promotion.isUnlimited
                                             ? AppColors.info.withOpacity(0.15)
-                                            : promotion.isActive
+                                            : widget.promotion.isActive
                                                 ? AppColors.success.withOpacity(0.15)
                                                 : AppColors.gray300.withOpacity(0.3),
                                         borderRadius: BorderRadius.circular(8),
@@ -334,9 +358,9 @@ class PromotionDetailPage extends StatelessWidget {
                                             width: 6,
                                             height: 6,
                                             decoration: BoxDecoration(
-                                              color: promotion.isUnlimited
+                                              color: widget.promotion.isUnlimited
                                                   ? AppColors.info
-                                                  : promotion.isActive
+                                                  : widget.promotion.isActive
                                                       ? AppColors.success
                                                       : AppColors.gray500,
                                               shape: BoxShape.circle,
@@ -344,17 +368,17 @@ class PromotionDetailPage extends StatelessWidget {
                                           ),
                                           const SizedBox(width: 6),
                                           Text(
-                                            promotion.isUnlimited
+                                            widget.promotion.isUnlimited
                                                 ? 'Sans limite'
-                                                : promotion.isActive
+                                                : widget.promotion.isActive
                                                     ? 'Active'
                                                     : 'Inactive',
                                             style: GoogleFonts.inter(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
-                                              color: promotion.isUnlimited
+                                              color: widget.promotion.isUnlimited
                                                   ? AppColors.info
-                                                  : promotion.isActive
+                                                  : widget.promotion.isActive
                                                       ? AppColors.success
                                                       : AppColors.gray600,
                                             ),
@@ -374,20 +398,20 @@ class PromotionDetailPage extends StatelessWidget {
                       Divider(color: AppColors.gray200, height: 1),
                       const SizedBox(height: AppSpacing.xl),
                       // Informations de localisation
-                      if (promotion.location != null) ...[
+                      if (widget.promotion.location != null) ...[
                         _buildDetailSection(
                           icon: Icons.location_on_rounded,
                           iconColor: AppColors.info,
                           title: 'Localisation',
                           children: [
-                            if (promotion.location!.ville != null && promotion.location!.ville!.isNotEmpty)
-                              _buildDetailRow('Ville', promotion.location!.ville!),
-                            if (promotion.location!.quartier != null && promotion.location!.quartier!.isNotEmpty)
-                              _buildDetailRow('Quartier/Commune', promotion.location!.quartier!),
-                            if (promotion.location!.avenue != null && promotion.location!.avenue!.isNotEmpty)
-                              _buildDetailRow('Avenue', promotion.location!.avenue!),
-                            if (promotion.location!.numero != null && promotion.location!.numero!.isNotEmpty)
-                              _buildDetailRow('Numéro', promotion.location!.numero!),
+                            if (widget.promotion.location!.ville != null && widget.promotion.location!.ville!.isNotEmpty)
+                              _buildDetailRow('Ville', widget.promotion.location!.ville!),
+                            if (widget.promotion.location!.quartier != null && widget.promotion.location!.quartier!.isNotEmpty)
+                              _buildDetailRow('Quartier/Commune', widget.promotion.location!.quartier!),
+                            if (widget.promotion.location!.avenue != null && widget.promotion.location!.avenue!.isNotEmpty)
+                              _buildDetailRow('Avenue', widget.promotion.location!.avenue!),
+                            if (widget.promotion.location!.numero != null && widget.promotion.location!.numero!.isNotEmpty)
+                              _buildDetailRow('Numéro', widget.promotion.location!.numero!),
                           ],
                         ),
                         const SizedBox(height: AppSpacing.lg),
@@ -398,19 +422,19 @@ class PromotionDetailPage extends StatelessWidget {
                         iconColor: AppColors.yellowPrimary,
                         title: 'Détails de la promotion',
                         children: [
-                          _buildDetailRow('Boisson', promotion.boissonName),
-                          _buildDetailRow('Formule', promotion.formule),
-                          if (promotion.price != null)
+                          _buildDetailRow('Boisson', widget.promotion.boissonName),
+                          _buildDetailRow('Formule', widget.promotion.formule),
+                          if (widget.promotion.price != null)
                             _buildDetailRow(
                               'Prix',
-                              '${promotion.price!.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ')} ${promotion.currency ?? ''}',
+                              '${widget.promotion.price!.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]} ')} ${widget.promotion.currency ?? ''}',
                             ),
-                          if (promotion.isUnlimited)
+                          if (widget.promotion.isUnlimited)
                             _buildDetailRow('Durée', 'Promotion continue (sans limite)')
                           else
                             _buildDetailRow(
                               'Période',
-                              'Du ${_formatDate(promotion.startDate)} au ${_formatDate(promotion.endDate)}',
+                              'Du ${_formatDate(widget.promotion.startDate)} au ${_formatDate(widget.promotion.endDate)}',
                             ),
                         ],
                       ),
@@ -427,7 +451,7 @@ class PromotionDetailPage extends StatelessWidget {
                                 child: _buildStatCard(
                                   icon: Icons.visibility_rounded,
                                   label: 'Vues',
-                                  value: _formatCount(promotion.viewCount),
+                                  value: _formatCount(widget.promotion.viewCount),
                                   color: AppColors.info,
                                 ),
                               ),
@@ -436,7 +460,7 @@ class PromotionDetailPage extends StatelessWidget {
                                 child: _buildStatCard(
                                   icon: Icons.favorite_rounded,
                                   label: 'Intéressés',
-                                  value: _formatCount(promotion.interestedCount),
+                                  value: _formatCount(widget.promotion.interestedCount),
                                   color: AppColors.error,
                                 ),
                               ),
@@ -452,33 +476,48 @@ class PromotionDetailPage extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal),
                   child: Column(
                     children: [
-                      // Bouton Voir itinéraire
-                      if (promotion.location != null && promotion.location!.latitude != null && promotion.location!.longitude != null)
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () => _openMaps(context, promotion.location!),
-                            icon: const Icon(Icons.directions_rounded, size: 22),
-                            label: Text(
-                              'Voir itinéraire',
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.info,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-                              ),
-                              elevation: 2,
+                      // Bouton Voir itinéraire - Toujours affiché
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            if (widget.promotion.location != null && 
+                                widget.promotion.location!.latitude != null && 
+                                widget.promotion.location!.longitude != null) {
+                              _openMaps(context, widget.promotion.location!);
+                            } else if (widget.promotion.location != null) {
+                              // Si on a une adresse mais pas de coordonnées, ouvrir Google Maps avec l'adresse
+                              _openMapsWithAddress(context, widget.promotion.location!);
+                            } else {
+                              // Aucune localisation disponible
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Localisation non disponible pour cette promotion'),
+                                  backgroundColor: AppColors.warning,
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.directions_rounded, size: 22),
+                          label: Text(
+                            'Voir itinéraire',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.info,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                            ),
+                            elevation: 2,
+                          ),
                         ),
-                      if (promotion.location != null && promotion.location!.latitude != null && promotion.location!.longitude != null)
-                        const SizedBox(height: AppSpacing.md),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
                       // Bouton Chat
                       SizedBox(
                         width: double.infinity,
@@ -662,6 +701,56 @@ class PromotionDetailPage extends StatelessWidget {
 
     final url = Uri.parse(
       'https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}',
+    );
+
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Impossible d\'ouvrir Google Maps';
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ouverture de la carte: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openMapsWithAddress(BuildContext context, PromotionLocation location) async {
+    // Construire l'adresse à partir des informations disponibles
+    final addressParts = <String>[];
+    if (location.numero != null && location.numero!.isNotEmpty) {
+      addressParts.add(location.numero!);
+    }
+    if (location.avenue != null && location.avenue!.isNotEmpty) {
+      addressParts.add(location.avenue!);
+    }
+    if (location.quartier != null && location.quartier!.isNotEmpty) {
+      addressParts.add(location.quartier!);
+    }
+    if (location.ville != null && location.ville!.isNotEmpty) {
+      addressParts.add(location.ville!);
+    }
+
+    if (addressParts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Adresse non disponible'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    final address = addressParts.join(', ');
+    final encodedAddress = Uri.encodeComponent(address);
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$encodedAddress',
     );
 
     try {

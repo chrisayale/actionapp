@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -1253,7 +1252,7 @@ class _CreateProfilePageState extends State<CreateProfilePage>
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: Colors.grey[400]!,
+                  color: Colors.grey[500]!,
                   width: 2.5,
                 ),
               ),

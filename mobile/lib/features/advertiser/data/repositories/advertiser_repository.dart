@@ -677,5 +677,30 @@ class AdvertiserRepository {
       throw Exception('Erreur lors du toggle du compteur intéressé: $e');
     }
   }
+
+  /// Increment view count for a promotion (no authentication required)
+  Future<void> incrementViewCount(String promotionId) async {
+    try {
+      if (kDebugMode) {
+        print('👁️ [AdvertiserRepository] Incrementing view count for promotion: $promotionId');
+      }
+
+      // Use FieldValue.increment for atomic increment
+      await _firestore.collection('promotions').doc(promotionId).update({
+        'viewCount': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (kDebugMode) {
+        print('✅ [AdvertiserRepository] View count incremented successfully');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ [AdvertiserRepository] Error incrementing view count: $e');
+      }
+      // Don't throw error - view count increment is not critical
+      // Just log it silently
+    }
+  }
 }
 

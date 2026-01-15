@@ -2454,9 +2454,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 obscureText: true,
                 obscuringCharacter: '●',
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                cursorColor: AppColors.textPrimaryLight,
+                cursorWidth: 2,
                 style: GoogleFonts.inter(
                   fontSize: actualWidth * 0.55,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.textPrimaryLight,
                   letterSpacing: 0,
                   height: 1.2,
@@ -2468,14 +2470,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(
-                      color: AppColors.gray400,
+                      color: AppColors.gray500,
                       width: 2.5,
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(
-                      color: AppColors.gray400,
+                      color: AppColors.gray500,
                       width: 2.5,
                     ),
                   ),
@@ -2598,9 +2600,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 obscureText: true,
                 obscuringCharacter: '●',
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                cursorColor: AppColors.textPrimaryLight,
+                cursorWidth: 2,
                 style: GoogleFonts.inter(
                   fontSize: actualWidth * 0.55,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.textPrimaryLight,
                   letterSpacing: 0,
                   height: 1.2,
@@ -2612,14 +2616,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(
-                      color: AppColors.gray400,
+                      color: AppColors.gray500,
                       width: 2.5,
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(
-                      color: AppColors.gray400,
+                      color: AppColors.gray500,
                       width: 2.5,
                     ),
                   ),
@@ -3538,7 +3542,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(20),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -3580,7 +3584,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             child: Text(
                               'Changer le code PIN',
                               style: GoogleFonts.inter(
-                                fontSize: 22,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.textPrimaryLight,
                                 letterSpacing: -0.5,
@@ -3589,7 +3593,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           ),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.xl),
+                      const SizedBox(height: 20),
                       // Ancien PIN
                       Text(
                         'Ancien code PIN',
@@ -3694,21 +3698,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: 4),
                               ),
                               child: Text(
                                 'Annuler',
                                 style: GoogleFonts.inter(
                                   color: AppColors.gray600,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 16,
+                                  fontSize: 14,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.md),
+                          const SizedBox(width: 6),
                           Expanded(
-                            flex: 2,
                             child: Container(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
@@ -3738,22 +3743,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: 4),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.save, color: AppColors.white, size: 20),
-                                    const SizedBox(width: AppSpacing.sm),
-                                    Text(
-                                      'Sauvegarder',
-                                      style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16,
-                                        color: AppColors.white,
-                                      ),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    'Sauvegarder',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color: AppColors.white,
                                     ),
-                                  ],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ),
                             ),
@@ -3833,9 +3838,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 obscureText: true,
                 obscuringCharacter: '●',
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                cursorColor: AppColors.textPrimaryLight,
+                cursorWidth: 2,
                 style: GoogleFonts.inter(
                   fontSize: actualWidth * 0.55,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.textPrimaryLight,
                   letterSpacing: 0,
                   height: 1.2,
@@ -3847,14 +3854,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(
-                      color: AppColors.gray400,
+                      color: AppColors.gray500,
                       width: 2.5,
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide(
-                      color: AppColors.gray400,
+                      color: AppColors.gray500,
                       width: 2.5,
                     ),
                   ),
