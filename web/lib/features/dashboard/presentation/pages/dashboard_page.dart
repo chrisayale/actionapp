@@ -48,17 +48,21 @@ class _DashboardPageState extends State<DashboardPage> {
           .get();
       final activePromotionsCount = activePromotionsSnapshot.docs.length;
 
-      setState(() {
-        _usersCount = usersCount;
-        _establishmentsCount = establishmentsCount;
-        _promotionsCount = promotionsCount;
-        _activePromotionsCount = activePromotionsCount;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _usersCount = usersCount;
+          _establishmentsCount = establishmentsCount;
+          _promotionsCount = promotionsCount;
+          _activePromotionsCount = activePromotionsCount;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

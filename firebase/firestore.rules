@@ -12,10 +12,16 @@ service cloud.firestore {
     match /users/{userId} {
       // Allow users to read their own data
       allow read: if request.auth != null && request.auth.uid == userId;
-      // Allow users to write their own data
-      allow write: if request.auth != null && request.auth.uid == userId;
+      // Allow users to write their own data (but not change role or isActive)
+      allow update: if request.auth != null 
+                    && request.auth.uid == userId
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isActive']));
       // Allow admins to read any user (this covers both individual reads and list queries)
       allow read: if isAdmin();
+      // Allow admins to update any user (including role and isActive)
+      allow update: if isAdmin();
+      // Allow admins to delete any user
+      allow delete: if isAdmin();
       // Allow reading any user document for authenticated users
       // This is needed so isAdmin() function can check the user's role
       // and to allow checking if any admin exists
