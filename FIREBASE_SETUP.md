@@ -107,7 +107,7 @@ apply plugin: 'com.google.gms.google-services'
 
 ```bash
 cd firebase
-firebase deploy --only firestore:rules,storage:rules
+firebase deploy --only firestore:rules,storage
 ```
 
 ## Vérification

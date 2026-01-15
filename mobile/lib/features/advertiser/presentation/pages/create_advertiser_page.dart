@@ -575,6 +575,9 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                               fontSize: 16,
                               letterSpacing: 0.2,
                             ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
@@ -666,22 +669,65 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
       }
     } catch (e) {
       if (mounted) {
+        // Extract a user-friendly error message
+        String errorMessage = e.toString();
+        
+        // If it's a timeout or connection error, show a simplified message
+        if (errorMessage.contains('Timeout') || 
+            errorMessage.contains('Impossible de se connecter')) {
+          errorMessage = 'Impossible de se connecter au serveur.\n\n'
+              '⚠️ Solution: Configurez le firewall Windows.\n'
+              'Voir: backend\\QUICK_FIX.md';
+        } else {
+          // For other errors, show the first line only
+          final lines = errorMessage.split('\n');
+          errorMessage = lines.isNotEmpty ? lines[0] : errorMessage;
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Erreur lors de la création: ${e.toString()}',
-                    style: GoogleFonts.inter(),
-                  ),
+                Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Erreur lors de la création',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  errorMessage,
+                  style: GoogleFonts.inter(fontSize: 14),
+                ),
+                if (errorMessage.contains('firewall') || 
+                    errorMessage.contains('Timeout'))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '💡 Ouvrez PowerShell en tant qu\'administrateur et exécutez:\n'
+                      '   .\\backend\\add_firewall_rule.ps1',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
               ],
             ),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
             ),
@@ -799,8 +845,12 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStepLabel(0, 'Établissement'),
-              _buildStepLabel(1, 'Localisation'),
+              Flexible(
+                child: _buildStepLabel(0, 'Établissement'),
+              ),
+              Flexible(
+                child: _buildStepLabel(1, 'Localisation'),
+              ),
             ],
           ),
         ],
@@ -822,7 +872,11 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
             ? AppColors.yellowPrimary
             : AppColors.textTertiaryLight,
       ),
-      child: Text(label),
+      child: Text(
+        label,
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+      ),
     );
   }
 
@@ -1109,12 +1163,16 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           children: [
             Row(
               children: [
-                Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: AppColors.textPrimaryLight,
+                Expanded(
+                  child: Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
                 if (required) ...[
@@ -1221,12 +1279,16 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           children: [
             Row(
               children: [
-                Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: AppColors.textPrimaryLight,
+                Expanded(
+                  child: Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
                 if (required) ...[
@@ -1244,7 +1306,8 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
             ),
             const SizedBox(height: AppSpacing.sm),
             DropdownButtonFormField<String>(
-              value: value,
+              isExpanded: true,
+              initialValue: value,
               dropdownColor: AppColors.white,
               decoration: InputDecoration(
                 hintText: hint,
@@ -1353,12 +1416,16 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           children: [
             Row(
               children: [
-                Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: AppColors.textPrimaryLight,
+                Expanded(
+                  child: Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
                 if (required) ...[
@@ -1456,12 +1523,16 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
           children: [
             Row(
               children: [
-                Text(
-                  'Localisation sur la carte',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: AppColors.textPrimaryLight,
+                Flexible(
+                  child: Text(
+                    'Localisation sur la carte',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -1492,6 +1563,8 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: hasLocation
@@ -1636,15 +1709,20 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.arrow_back_ios_rounded, size: 18),
                       const SizedBox(width: 8),
-                      Text(
-                        'Précédent',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: AppColors.textPrimaryLight,
+                      Flexible(
+                        child: Text(
+                          'Précédent',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: AppColors.textPrimaryLight,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
                     ],
@@ -1686,13 +1764,19 @@ class _CreateAdvertiserPageState extends State<CreateAdvertiserPage>
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        _currentStep < 1 ? 'Suivant' : 'Créer',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          letterSpacing: 0.2,
+                      Flexible(
+                        child: Text(
+                          _currentStep < 1 ? 'Suivant' : 'Créer',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            letterSpacing: 0.2,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
                         ),
                       ),
                       if (_currentStep < 1) ...[

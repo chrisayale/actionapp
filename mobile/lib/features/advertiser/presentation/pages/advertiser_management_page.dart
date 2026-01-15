@@ -35,6 +35,7 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
   }
 
   Future<void> _loadEstablishments() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -42,11 +43,13 @@ class _AdvertiserManagementPageState extends State<AdvertiserManagementPage> {
 
     try {
       final establishments = await _repository.getEstablishments();
+      if (!mounted) return;
       setState(() {
         _establishments = establishments;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;

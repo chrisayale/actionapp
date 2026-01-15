@@ -148,10 +148,43 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       }
     } catch (e) {
       if (mounted) {
+        // Extraire le message d'erreur de manière plus lisible
+        String errorMessage = 'Erreur lors du chargement des promotions';
+        if (e.toString().contains('Timeout')) {
+          errorMessage = 'Le serveur ne répond pas. Vérifiez votre connexion internet.';
+        } else if (e.toString().contains('Exception:')) {
+          final exceptionMatch = RegExp(r'Exception:\s*(.+)').firstMatch(e.toString());
+          if (exceptionMatch != null) {
+            errorMessage = exceptionMatch.group(1) ?? errorMessage;
+          }
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors du chargement des promotions: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    errorMessage,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: AppColors.error,
+            // Use default (fixed) behavior to avoid off‑screen issues
+            // when there is a large bottom area (FAB / footer / bottom bar).
+            behavior: SnackBarBehavior.fixed,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Réessayer',
+              textColor: Colors.white,
+              onPressed: () {
+                _loadPublicPromotions();
+              },
+            ),
           ),
         );
         setState(() {
@@ -902,6 +935,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   'À proximité',
@@ -910,6 +944,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.textPrimaryLight,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                                 const SizedBox(height: AppSpacing.xs / 2),
                                 Text(
@@ -919,6 +955,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     color: AppColors.textSecondaryLight,
                                     fontWeight: FontWeight.w400,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               ],
                             ),
@@ -933,41 +971,48 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               Container(
                 width: 1,
                 height: 40,
-                        color: AppColors.gray300,
+                color: AppColors.gray300,
                 margin: const EdgeInsets.symmetric(horizontal: 8),
               ),
               // Section "Annonceur" - droite
-              Material(
-                color: AppColors.white.withOpacity(0),
-                child: InkWell(
-                  onTap: () {
-                    _handleAnnonceurClick();
-                  },
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal, vertical: AppSpacing.sm + 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFD700), // Jaune solide
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.business,
-                          color: AppColors.textPrimaryLight,
-                          size: 20,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Text(
-                          'Annonceur',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
+              Flexible(
+                child: Material(
+                  color: AppColors.white.withOpacity(0),
+                  child: InkWell(
+                    onTap: () {
+                      _handleAnnonceurClick();
+                    },
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm + 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD700), // Jaune solide
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.business,
                             color: AppColors.textPrimaryLight,
+                            size: 20,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: AppSpacing.sm),
+                          Flexible(
+                            child: Text(
+                              'Annonceur',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimaryLight,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1038,7 +1083,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]} ',
     );
-    return '${formattedPrice} ${promotion.currency ?? ''}';
+    return '$formattedPrice ${promotion.currency ?? ''}';
   }
 
   /// Format view count (e.g., 1000 -> "1K", 1500 -> "1.5K")
@@ -1583,59 +1628,67 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           ),
                           const SizedBox(width: AppSpacing.sm + 2),
                           // Bouton "Je serais là" animé
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  _colorAnimation.value ?? const Color(0xFFFFD700),
-                                  const Color(0xFFFF6B35),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (_colorAnimation.value ?? const Color(0xFFFFD700))
-                                      .withOpacity(_glowAnimation.value * 0.5),
-                                  blurRadius: 10,
-                                  spreadRadius: 1,
-                                  offset: const Offset(0, 3),
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    _colorAnimation.value ?? const Color(0xFFFFD700),
+                                    const Color(0xFFFF6B35),
+                                  ],
                                 ),
-                                BoxShadow(
-                                  color: const Color(0xFF4CAF50).withOpacity(_glowAnimation.value * 0.3),
-                                  blurRadius: 8,
-                                  spreadRadius: 1,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: ElevatedButton(
-                              onPressed: onInterestedTap,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                foregroundColor: Colors.black87,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenHorizontal, vertical: AppSpacing.sm + 4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.thumb_up, size: 18),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Je serais là',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimaryLight,
-                                    ),
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (_colorAnimation.value ?? const Color(0xFFFFD700))
+                                        .withOpacity(_glowAnimation.value * 0.5),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                  BoxShadow(
+                                    color: const Color(0xFF4CAF50).withOpacity(_glowAnimation.value * 0.3),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: onInterestedTap,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  foregroundColor: Colors.black87,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.sm + 4,
+                                    vertical: AppSpacing.sm + 4,
+                                  ),
+                                ),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.thumb_up, size: 18),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Je serais là',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.textPrimaryLight,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -1672,7 +1725,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     PromotionLocation? promotionLocation,
     VoidCallback? onInterestedTap,
     VoidCallback? onLocationTap,
-    VoidCallback? onViewMoreTap,
   }) {
     return AnimatedBuilder(
       animation: _animationController,
@@ -1712,6 +1764,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 borderRadius: BorderRadius.circular(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Header avec panneau jaune et icône ou image
                     Container(
@@ -1853,6 +1906,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       padding: const EdgeInsets.all(AppSpacing.sm),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           // Nom
                           Text(
@@ -1924,7 +1978,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           // Distance, rating et vues
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2184,7 +2238,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
-                          flex: 2,
                           child: Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -2220,15 +2273,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const Icon(Icons.lock_reset, color: AppColors.white, size: 20),
                                   const SizedBox(width: AppSpacing.sm),
-                                  Text(
-                                    'Modifier le PIN',
-                                    style: GoogleFonts.inter(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
-                                      color: AppColors.white,
+                                  Flexible(
+                                    child: Text(
+                                      'Modifier le PIN',
+                                      style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                        color: AppColors.white,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
                                     ),
                                   ),
                                 ],
@@ -2963,14 +3021,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: List.generate(
                           4,
-                          (index) => _buildDialogPINField(
-                            index,
-                            _pinDialogControllers[index],
-                            _pinDialogFocusNodes[index],
-                            isConfirm: false,
+                          (index) => Flexible(
+                            child: _buildDialogPINField(
+                              index,
+                              _pinDialogControllers[index],
+                              _pinDialogFocusNodes[index],
+                              isConfirm: false,
+                            ),
                           ),
                         ),
                       ),
@@ -3037,7 +3097,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           ),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
-                            flex: 2,
                             child: Container(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
@@ -3071,15 +3130,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(Icons.save, color: AppColors.white, size: 20),
                                     const SizedBox(width: AppSpacing.sm),
-                                    Text(
-                                      'Sauvegarder',
-                                      style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16,
-                                        color: AppColors.white,
+                                    Flexible(
+                                      child: Text(
+                                        'Sauvegarder',
+                                        style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                          color: AppColors.white,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
                                       ),
                                     ),
                                   ],

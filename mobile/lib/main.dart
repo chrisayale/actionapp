@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show kDebugMode, kIsWeb, defaultTargetPlatform;
-import 'package:flutter/services.dart' show TargetPlatform;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -21,10 +20,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Connecter aux emulators Firebase en mode debug/local
-  if (kDebugMode) {
-    await _connectToFirebaseEmulators();
-  }
+  // Utiliser exclusivement Firebase en ligne (production)
+  // Les emulators sont désactivés même en mode debug
+  // if (kDebugMode) {
+  //   await _connectToFirebaseEmulators();
+  // }
 
   runApp(const MyApp());
 }

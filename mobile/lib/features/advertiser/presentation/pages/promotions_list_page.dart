@@ -67,10 +67,41 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
       }
     } catch (e) {
       if (mounted) {
+        // Extraire le message d'erreur de manière plus lisible
+        String errorMessage = 'Erreur lors du chargement des promotions';
+        if (e.toString().contains('Timeout')) {
+          errorMessage = 'Le serveur ne répond pas. Vérifiez votre connexion internet.';
+        } else if (e.toString().contains('Exception:')) {
+          final exceptionMatch = RegExp(r'Exception:\s*(.+)').firstMatch(e.toString());
+          if (exceptionMatch != null) {
+            errorMessage = exceptionMatch.group(1) ?? errorMessage;
+          }
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors du chargement des promotions: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    errorMessage,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.fixed,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Réessayer',
+              textColor: Colors.white,
+              onPressed: () {
+                _loadPromotions();
+              },
+            ),
           ),
         );
         setState(() {
@@ -217,8 +248,7 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
                           onPrimary: AppColors.textPrimaryLight,
                           surface: AppColors.white,
                           onSurface: AppColors.textPrimaryLight,
-                        ),
-                        dialogBackgroundColor: AppColors.white,
+                        ), dialogTheme: DialogThemeData(backgroundColor: AppColors.white),
                       ),
                       child: child!,
                     );
@@ -297,8 +327,7 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
                           onPrimary: AppColors.textPrimaryLight,
                           surface: AppColors.white,
                           onSurface: AppColors.textPrimaryLight,
-                        ),
-                        dialogBackgroundColor: AppColors.white,
+                        ), dialogTheme: DialogThemeData(backgroundColor: AppColors.white),
                       ),
                       child: child!,
                     );
@@ -713,10 +742,7 @@ class _PromotionsListPageState extends State<PromotionsListPage> {
             style: GoogleFonts.inter(),
           ),
           backgroundColor: promotion.isActive ? AppColors.warning : AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-          ),
+          behavior: SnackBarBehavior.fixed,
         ),
       );
     }

@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
@@ -181,7 +180,7 @@ class _ProfilePageState extends State<ProfilePage>
     try {
       final ref = FirebaseService.storage
           .ref()
-          .child('profile_photos')
+          .child('profile_pictures')
           .child('$userId.jpg');
 
       await ref.putData(imageBytes);
@@ -435,7 +434,7 @@ class _ProfilePageState extends State<ProfilePage>
           try {
             final ref = FirebaseService.storage
                 .ref()
-                .child('profile_photos')
+                .child('profile_pictures')
                 .child('${user.uid}.jpg');
             await ref.delete();
           } catch (e) {
@@ -849,7 +848,7 @@ class _ProfilePageState extends State<ProfilePage>
         Row(
           children: [
             Expanded(child: _buildGenderOption('M', 'Homme', Icons.male)),
-            const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(child: _buildGenderOption('F', 'Femme', Icons.female)),
           ],
         ),
@@ -868,7 +867,7 @@ class _ProfilePageState extends State<ProfilePage>
       child: Container(
         padding: const EdgeInsets.symmetric(
           vertical: AppSpacing.md,
-          horizontal: AppSpacing.sm,
+          horizontal: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
           color: isSelected
@@ -886,17 +885,21 @@ class _ProfilePageState extends State<ProfilePage>
             Icon(
               icon,
               color: isSelected ? const Color(0xFFFF6B35) : AppColors.gray500,
-              size: 20,
+              size: 18,
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected
-                    ? const Color(0xFFFF6B35)
-                    : AppColors.textSecondaryLight,
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? const Color(0xFFFF6B35)
+                      : AppColors.textSecondaryLight,
+                ),
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
             ),
           ],

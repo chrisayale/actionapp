@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,6 +6,8 @@ import '../auth_controller.dart';
 import 'otp_verification_page.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/routes/app_routes.dart';
+import '../../core/services/firebase_service.dart';
 
 /// Phone number input screen
 class PhoneInputPage extends StatefulWidget {
@@ -24,18 +27,70 @@ class _PhoneInputPageState extends State<PhoneInputPage> {
   final _phoneController = TextEditingController();
   Country _selectedCountry = Country.parse(AppConstants.defaultCountryCode);
   bool _isValid = false;
+  StreamSubscription<bool>? _autoVerificationSubscription;
 
   @override
   void initState() {
     super.initState();
     _phoneController.addListener(_validatePhone);
+    // Écouter la vérification automatique
+    _autoVerificationSubscription = widget.authController.autoVerificationStream.listen(
+      (success) {
+        if (success && mounted) {
+          _handleAutoVerificationSuccess();
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
     _phoneController.removeListener(_validatePhone);
     _phoneController.dispose();
+    _autoVerificationSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _handleAutoVerificationSuccess() async {
+    // Vérifier si le profil existe dans Firestore
+    final user = widget.authController.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseService.firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        
+        if (userDoc.exists && userDoc.data()?['profileComplete'] == true) {
+          // Profil complet, naviguer vers home
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.home,
+              (route) => false,
+            );
+          }
+        } else {
+          // Profil incomplet ou inexistant, naviguer vers create-profile
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.createProfile,
+              (route) => false,
+            );
+          }
+        }
+      } catch (e) {
+        // En cas d'erreur, naviguer vers create-profile par défaut
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.createProfile,
+            (route) => false,
+          );
+        }
+      }
+    }
   }
 
   void _validatePhone() {
@@ -72,6 +127,11 @@ class _PhoneInputPageState extends State<PhoneInputPage> {
     final success = await widget.authController.sendOTP(phoneNumber);
 
     if (!mounted) return;
+
+    // Si la vérification automatique a réussi, ne pas naviguer vers OTP
+    if (widget.authController.autoVerified) {
+      return; // La navigation sera gérée par _handleAutoVerificationSuccess
+    }
 
     if (success && widget.authController.verificationId != null) {
       Navigator.pushReplacement(

@@ -519,7 +519,9 @@ class _CreateProfilePageState extends State<CreateProfilePage>
         profileData['dateOfBirth'] = _selectedDateOfBirth!.toIso8601String();
       }
       
-      // photoUrl sera ajouté après l'upload en arrière-plan
+      // Toujours initialiser photoUrl à null par défaut pour garantir que le document existe
+      // Si une photo est sélectionnée, elle sera ajoutée après l'upload en arrière-plan
+      profileData['photoUrl'] = null;
       
       // Attribuer le PIN par défaut "1234" si aucun PIN n'est fourni
       final pinToSave = pin.isNotEmpty ? pin : '1234';
@@ -558,7 +560,7 @@ class _CreateProfilePageState extends State<CreateProfilePage>
           print('❌ Erreur Firestore: $firestoreError');
           print('   Type: ${firestoreError.runtimeType}');
         }
-        throw firestoreError; // Re-lancer pour être capturé par le catch global
+        rethrow; // Re-lancer pour être capturé par le catch global
       }
 
       // Mettre à jour le displayName dans Firebase Auth si fourni
@@ -580,15 +582,31 @@ class _CreateProfilePageState extends State<CreateProfilePage>
       if (mounted) {
         // Fermer le dialogue de progression s'il est ouvert
         Navigator.of(context).pop();
+        
+        // Extraire le message d'erreur de manière plus lisible
+        String errorMessage = 'Erreur lors de la sauvegarde';
+        if (e.toString().contains('Timeout')) {
+          errorMessage = 'Le serveur ne répond pas. Vérifiez votre connexion internet.';
+        } else if (e.toString().contains('Exception:')) {
+          final exceptionMatch = RegExp(r'Exception:\s*(.+)').firstMatch(e.toString());
+          if (exceptionMatch != null) {
+            errorMessage = exceptionMatch.group(1) ?? errorMessage;
+          } else {
+            errorMessage = e.toString().replaceFirst('Exception: ', '');
+          }
+        } else {
+          errorMessage = e.toString();
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.error_outline, color: Colors.white),
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Erreur lors de la sauvegarde: $e',
+                    errorMessage,
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),
@@ -599,7 +617,19 @@ class _CreateProfilePageState extends State<CreateProfilePage>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            margin: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(
+              left: 16,
+              right: 16,
+              bottom: 16,
+            ),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Réessayer',
+              textColor: Colors.white,
+              onPressed: () {
+                _handleSubmit(skip: false);
+              },
+            ),
           ),
         );
       }
@@ -623,7 +653,11 @@ class _CreateProfilePageState extends State<CreateProfilePage>
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: padding),
+          padding: EdgeInsets.only(
+            left: padding,
+            right: padding,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 80, // Padding supplémentaire pour éviter le chevauchement avec le SnackBar
+          ),
           child: Form(
             key: _formKey,
             child: Column(
@@ -1473,7 +1507,7 @@ class _CreateProfilePageState extends State<CreateProfilePage>
       // Utiliser this.context au lieu du context passé en paramètre pour éviter les erreurs
       if (!mounted) return;
       
-      final scaffoldMessenger = ScaffoldMessenger.of(this.context);
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
       final grantedCount = results.values.where((granted) => granted).length;
       final totalCount = results.length;
 
@@ -1577,7 +1611,7 @@ class _CreateProfilePageState extends State<CreateProfilePage>
       
       if (!mounted) return;
       
-      ScaffoldMessenger.of(this.context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
@@ -1611,15 +1645,21 @@ class _CreateProfilePageState extends State<CreateProfilePage>
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              color: Colors.white,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                color: Colors.white,
+              ),
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                 // Icon avec animation
                 Container(
                   width: 80,
@@ -1736,7 +1776,9 @@ class _CreateProfilePageState extends State<CreateProfilePage>
                     ),
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         );
@@ -2025,7 +2067,7 @@ class _CreateProfilePageState extends State<CreateProfilePage>
         );
         
         // Attendre que l'upload soit complètement terminé
-        await uploadResult;
+        uploadResult;
         
         if (kDebugMode) {
           print('   ✅ Upload terminé avec succès');

@@ -66,7 +66,12 @@ const createEstablishment = async (req, res) => {
     console.log('📝 Attempting to save establishment to Firestore...');
     console.log('   Collection: establishments');
     console.log('   Data keys:', Object.keys(establishmentData));
-    console.log('   Firestore Emulator Host:', process.env.FIRESTORE_EMULATOR_HOST);
+    if (process.env.FIRESTORE_EMULATOR_HOST) {
+      console.log('   ⚠️  Firestore Emulator Host:', process.env.FIRESTORE_EMULATOR_HOST);
+      console.log('   ⚠️  MODE EMULATOR - Les données ne seront PAS enregistrées dans Firebase en ligne');
+    } else {
+      console.log('   ✅ Firebase Production - Les données seront enregistrées directement dans Firebase en ligne');
+    }
     
     try {
       const docRef = await db.collection('establishments').add(establishmentData);

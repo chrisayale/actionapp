@@ -345,8 +345,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
               onPrimary: AppColors.textPrimaryLight,
               surface: AppColors.white,
               onSurface: AppColors.textPrimaryLight,
-            ),
-            dialogBackgroundColor: AppColors.white,
+            ), dialogTheme: DialogThemeData(backgroundColor: AppColors.white),
           ),
           child: child!,
         );
@@ -1073,7 +1072,8 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
             ),
             const SizedBox(height: AppSpacing.sm),
             DropdownButtonFormField<DrinkModel>(
-              value: _selectedDrink,
+              isExpanded: true,
+              initialValue: _selectedDrink,
               dropdownColor: AppColors.white,
               decoration: InputDecoration(
                 hintText: 'Sélectionner une boisson',
@@ -1423,7 +1423,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   flex: 1,
                   child: Container(
@@ -1432,7 +1432,8 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                         borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
                       ),
                       child: DropdownButtonFormField<String>(
-                        value: _selectedCurrency,
+                        isExpanded: true,
+                        initialValue: _selectedCurrency,
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: AppColors.backgroundSecondaryLight,
@@ -1449,7 +1450,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
+                            horizontal: AppSpacing.xs + 4,
                             vertical: AppSpacing.sm + 4,
                           ),
                         ),
@@ -1471,6 +1472,8 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                             value: currency,
                             child: Text(
                               currency,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                               style: GoogleFonts.inter(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -1579,7 +1582,7 @@ class _CreatePromotionPageState extends State<CreatePromotionPage> {
                   }
                 });
               },
-              activeColor: AppColors.yellowPrimary,
+              activeThumbColor: AppColors.yellowPrimary,
               activeTrackColor: AppColors.yellowPrimary.withOpacity(0.5),
             ),
           ],

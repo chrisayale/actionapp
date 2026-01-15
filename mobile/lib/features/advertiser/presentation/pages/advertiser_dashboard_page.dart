@@ -427,10 +427,7 @@ class AdvertiserDashboardPage extends StatelessWidget {
                         style: GoogleFonts.inter(),
                       ),
                       backgroundColor: AppColors.info,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-                      ),
+                      behavior: SnackBarBehavior.fixed,
                     ),
                   );
                 },
@@ -521,31 +518,37 @@ class AdvertiserDashboardPage extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: AppColors.yellowPrimary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: AppColors.yellowPrimary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+                        ),
+                        child: const Icon(
+                          Icons.local_offer_rounded,
+                          color: AppColors.yellowPrimary,
+                          size: 24,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.local_offer_rounded,
-                        color: AppColors.yellowPrimary,
-                        size: 24,
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Promotions',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: GoogleFonts.inter(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimaryLight,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      'Promotions',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimaryLight,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 TextButton(
                   onPressed: () {
@@ -786,27 +789,31 @@ class AdvertiserDashboardPage extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Plan actuel',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: AppColors.textSecondaryLight,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Plan actuel',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: AppColors.textSecondaryLight,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            currentPlan,
-                            style: GoogleFonts.inter(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimaryLight,
-                              letterSpacing: -0.5,
+                            const SizedBox(height: 6),
+                            Text(
+                              currentPlan,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: GoogleFonts.inter(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimaryLight,
+                                letterSpacing: -0.5,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -998,31 +1005,37 @@ class AdvertiserDashboardPage extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+                        ),
+                        child: const Icon(
+                          Icons.person_outline_rounded,
+                          color: AppColors.success,
+                          size: 24,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.person_outline_rounded,
-                        color: AppColors.success,
-                        size: 24,
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Profil',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: GoogleFonts.inter(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimaryLight,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      'Profil',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimaryLight,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 TextButton.icon(
                   onPressed: () {
@@ -1080,10 +1093,7 @@ class AdvertiserDashboardPage extends StatelessWidget {
                         style: GoogleFonts.inter(),
                       ),
                       backgroundColor: AppColors.warning,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-                      ),
+                      behavior: SnackBarBehavior.fixed,
                     ),
                   );
                 },

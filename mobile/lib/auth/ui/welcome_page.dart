@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
@@ -6,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../auth_controller.dart';
 import 'otp_verification_page.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/routes/app_routes.dart';
+import '../../core/services/firebase_service.dart';
 
 /// Welcome screen - First screen shown to user with phone input
 class WelcomePage extends StatefulWidget {
@@ -32,6 +35,7 @@ class _WelcomePageState extends State<WelcomePage>
   late Animation<double> _glowAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<Color?> _colorAnimation;
+  StreamSubscription<bool>? _autoVerificationSubscription;
 
   @override
   void initState() {
@@ -41,6 +45,14 @@ class _WelcomePageState extends State<WelcomePage>
         _phoneLength = _phoneController.text.length;
       });
     });
+    // Écouter la vérification automatique
+    _autoVerificationSubscription = widget.authController.autoVerificationStream.listen(
+      (success) {
+        if (success && mounted) {
+          _handleAutoVerificationSuccess();
+        }
+      },
+    );
 
     // Animation controller for vibrant effects
     _animationController = AnimationController(
@@ -72,7 +84,50 @@ class _WelcomePageState extends State<WelcomePage>
   void dispose() {
     _phoneController.dispose();
     _animationController.dispose();
+    _autoVerificationSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _handleAutoVerificationSuccess() async {
+    // Vérifier si le profil existe dans Firestore
+    final user = widget.authController.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseService.firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        
+        if (userDoc.exists && userDoc.data()?['profileComplete'] == true) {
+          // Profil complet, naviguer vers home
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.home,
+              (route) => false,
+            );
+          }
+        } else {
+          // Profil incomplet ou inexistant, naviguer vers create-profile
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.createProfile,
+              (route) => false,
+            );
+          }
+        }
+      } catch (e) {
+        // En cas d'erreur, naviguer vers create-profile par défaut
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.createProfile,
+            (route) => false,
+          );
+        }
+      }
+    }
   }
 
   String? _validatePhone(String? value) {
@@ -98,6 +153,11 @@ class _WelcomePageState extends State<WelcomePage>
     if (!mounted) return;
 
     setState(() => _isLoading = false);
+
+    // Si la vérification automatique a réussi, ne pas naviguer vers OTP
+    if (widget.authController.autoVerified) {
+      return; // La navigation sera gérée par _handleAutoVerificationSuccess
+    }
 
     if (success && widget.authController.verificationId != null) {
       Navigator.pushReplacement(
@@ -222,7 +282,7 @@ class _WelcomePageState extends State<WelcomePage>
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Image.asset(
-                'assets/images/logo.png',
+                'assets/images/Logo.png',
                 width: 70,
                 height: 70,
                 fit: BoxFit.contain,

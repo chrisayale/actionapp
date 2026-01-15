@@ -273,30 +273,37 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
               ),
               const SizedBox(height: AppSpacing.md),
               // Prix
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    price,
-                    style: GoogleFonts.inter(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: color,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      period,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      price,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: AppColors.textSecondaryLight,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        period,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: AppSpacing.md),
               Divider(color: AppColors.gray200, height: 1),
@@ -380,4 +387,6 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
     Navigator.pop(context);
   }
 }
+
+
 

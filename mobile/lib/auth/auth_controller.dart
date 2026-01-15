@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'auth_service.dart';
@@ -14,12 +15,18 @@ class AuthController extends ChangeNotifier {
   String? _errorMessage;
   String? _verificationId;
   String? _phoneNumber;
+  bool _autoVerified = false;
+
+  // Stream controller for auto-verification events
+  final _autoVerificationController = StreamController<bool>.broadcast();
+  Stream<bool> get autoVerificationStream => _autoVerificationController.stream;
 
   // Getters
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   String? get verificationId => _verificationId;
   String? get phoneNumber => _phoneNumber;
+  bool get autoVerified => _autoVerified;
   User? get currentUser => _authService.currentUser;
 
   /// Clear error message
@@ -33,6 +40,7 @@ class AuthController extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     _phoneNumber = phoneNumber;
+    _autoVerified = false;
     notifyListeners();
 
     try {
@@ -42,6 +50,23 @@ class AuthController extends ChangeNotifier {
           _errorMessage = _getErrorMessage(e);
           _isLoading = false;
           notifyListeners();
+        },
+        onVerificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-verification: SMS détecté automatiquement par Android
+          // Le credential est déjà prêt, on se connecte directement
+          try {
+            await FirebaseAuth.instance.signInWithCredential(credential);
+            _autoVerified = true;
+            _isLoading = false;
+            notifyListeners();
+            // Notifier que la vérification automatique est complète
+            _autoVerificationController.add(true);
+          } catch (e) {
+            _errorMessage = 'Erreur lors de la vérification automatique';
+            _isLoading = false;
+            notifyListeners();
+            _autoVerificationController.add(false);
+          }
         },
       );
 
@@ -152,7 +177,14 @@ class AuthController extends ChangeNotifier {
     _verificationId = null;
     _phoneNumber = null;
     _errorMessage = null;
+    _autoVerified = false;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _autoVerificationController.close();
+    super.dispose();
   }
 }
 

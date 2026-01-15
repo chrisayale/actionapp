@@ -71,7 +71,7 @@ firebase deploy --only firestore:rules
 
 ### Déployer les règles Storage:
 ```bash
-firebase deploy --only storage:rules
+firebase deploy --only storage
 ```
 
 ### Déployer tout:

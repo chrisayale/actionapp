@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class EstablishmentModel {
   final String id;
   final String userId;
@@ -41,26 +43,30 @@ class EstablishmentModel {
       createdAt: json['createdAt'] != null
           ? (json['createdAt'] is DateTime
               ? json['createdAt'] as DateTime
-              : json['createdAt'] is String
-                  ? DateTime.parse(json['createdAt'] as String)
-                  : json['createdAt'] is Map<String, dynamic>
-                      ? ((json['createdAt'] as Map<String, dynamic>).containsKey('_seconds')
-                          ? DateTime.fromMillisecondsSinceEpoch(
-                              ((json['createdAt'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
-                          : DateTime.parse(json['createdAt'].toString()))
-                      : DateTime.parse(json['createdAt'].toString()))
+              : json['createdAt'] is Timestamp
+                  ? (json['createdAt'] as Timestamp).toDate()
+                  : json['createdAt'] is String
+                      ? DateTime.parse(json['createdAt'] as String)
+                      : json['createdAt'] is Map<String, dynamic>
+                          ? ((json['createdAt'] as Map<String, dynamic>).containsKey('_seconds')
+                              ? DateTime.fromMillisecondsSinceEpoch(
+                                  ((json['createdAt'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
+                              : DateTime.parse(json['createdAt'].toString()))
+                          : null)
           : null,
       updatedAt: json['updatedAt'] != null
           ? (json['updatedAt'] is DateTime
               ? json['updatedAt'] as DateTime
-              : json['updatedAt'] is String
-                  ? DateTime.parse(json['updatedAt'] as String)
-                  : json['updatedAt'] is Map<String, dynamic>
-                      ? ((json['updatedAt'] as Map<String, dynamic>).containsKey('_seconds')
-                          ? DateTime.fromMillisecondsSinceEpoch(
-                              ((json['updatedAt'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
-                          : DateTime.parse(json['updatedAt'].toString()))
-                      : DateTime.parse(json['updatedAt'].toString()))
+              : json['updatedAt'] is Timestamp
+                  ? (json['updatedAt'] as Timestamp).toDate()
+                  : json['updatedAt'] is String
+                      ? DateTime.parse(json['updatedAt'] as String)
+                      : json['updatedAt'] is Map<String, dynamic>
+                          ? ((json['updatedAt'] as Map<String, dynamic>).containsKey('_seconds')
+                              ? DateTime.fromMillisecondsSinceEpoch(
+                                  ((json['updatedAt'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
+                              : DateTime.parse(json['updatedAt'].toString()))
+                          : null)
           : null,
     );
   }

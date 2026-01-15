@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 
 /// Service for handling Firebase Phone Authentication
@@ -20,6 +21,9 @@ class AuthService {
     Function(FirebaseAuthException)? onError,
     Function(PhoneAuthCredential)? onVerificationCompleted,
   }) async {
+    final completer = Completer<String>();
+    bool isCompleted = false;
+
     try {
       await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
@@ -30,12 +34,19 @@ class AuthService {
           } else {
             await _auth.signInWithCredential(credential);
           }
+          if (!isCompleted && !completer.isCompleted) {
+            isCompleted = true;
+            // For auto-verification, we don't have a verificationId
+            // This case is handled by the onVerificationCompleted callback
+          }
         },
         verificationFailed: (FirebaseAuthException e) {
           if (onError != null) {
             onError(e);
-          } else {
-            throw e;
+          }
+          if (!isCompleted && !completer.isCompleted) {
+            isCompleted = true;
+            completer.completeError(e);
           }
         },
         codeSent: (String verificationId, int? resendToken) {
@@ -44,19 +55,27 @@ class AuthService {
           if (onCodeSent != null) {
             onCodeSent(verificationId);
           }
+          if (!isCompleted && !completer.isCompleted) {
+            isCompleted = true;
+            completer.complete(verificationId);
+          }
         },
         codeAutoRetrievalTimeout: (String verificationId) {
           _verificationId = verificationId;
+          if (!isCompleted && !completer.isCompleted) {
+            isCompleted = true;
+            completer.complete(verificationId);
+          }
         },
         timeout: const Duration(seconds: 60),
       );
 
-      if (_verificationId == null) {
-        throw Exception('Verification ID not received');
-      }
-
-      return _verificationId!;
+      // Wait for the callback to complete
+      return await completer.future;
     } catch (e) {
+      if (!completer.isCompleted) {
+        completer.completeError(e);
+      }
       rethrow;
     }
   }
@@ -84,17 +103,24 @@ class AuthService {
     Function(String)? onCodeSent,
     Function(FirebaseAuthException)? onError,
   }) async {
+    final completer = Completer<String>();
+    bool isCompleted = false;
+
     try {
       await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
         verificationCompleted: (PhoneAuthCredential credential) async {
           await _auth.signInWithCredential(credential);
+          // For auto-verification, we don't have a verificationId
+          // This case doesn't need resend
         },
         verificationFailed: (FirebaseAuthException e) {
           if (onError != null) {
             onError(e);
-          } else {
-            throw e;
+          }
+          if (!isCompleted && !completer.isCompleted) {
+            isCompleted = true;
+            completer.completeError(e);
           }
         },
         codeSent: (String verificationId, int? resendToken) {
@@ -103,20 +129,28 @@ class AuthService {
           if (onCodeSent != null) {
             onCodeSent(verificationId);
           }
+          if (!isCompleted && !completer.isCompleted) {
+            isCompleted = true;
+            completer.complete(verificationId);
+          }
         },
         codeAutoRetrievalTimeout: (String verificationId) {
           _verificationId = verificationId;
+          if (!isCompleted && !completer.isCompleted) {
+            isCompleted = true;
+            completer.complete(verificationId);
+          }
         },
         forceResendingToken: _resendToken,
         timeout: const Duration(seconds: 60),
       );
 
-      if (_verificationId == null) {
-        throw Exception('Verification ID not received');
-      }
-
-      return _verificationId!;
+      // Wait for the callback to complete
+      return await completer.future;
     } catch (e) {
+      if (!completer.isCompleted) {
+        completer.completeError(e);
+      }
       rethrow;
     }
   }

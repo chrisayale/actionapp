@@ -6,23 +6,16 @@ const admin = require('firebase-admin');
 // Load environment variables
 dotenv.config();
 
-// Configure Firestore emulator for local development
-// This allows the backend to use Firestore emulator instead of production
-if (!process.env.FIRESTORE_EMULATOR_HOST) {
-  process.env.FIRESTORE_EMULATOR_HOST = 'localhost:9081';
-  console.log('🔧 Auto-configuring Firestore emulator: localhost:9081');
-  console.log('   (Set FIRESTORE_EMULATOR_HOST in .env to override or disable)');
-}
-
 // Initialize Firebase Admin
-// For emulator mode, we can use minimal config
-// For production, we need service account credentials
+// By default, use production Firebase (not emulators)
+// To use emulators, explicitly set FIRESTORE_EMULATOR_HOST in .env
 const useEmulators = process.env.FIRESTORE_EMULATOR_HOST && process.env.FIRESTORE_EMULATOR_HOST !== '';
 
 if (useEmulators) {
-  // Use emulators - minimal config needed
-  console.log('🔧 Using Firebase Emulators for development');
+  // Use emulators - minimal config needed (only if explicitly configured)
+  console.log('⚠️  MODE EMULATOR ACTIVÉ (développement local uniquement)');
   console.log(`   Firestore Emulator: ${process.env.FIRESTORE_EMULATOR_HOST}`);
+  console.log('   ⚠️  Les données seront enregistrées dans les emulators, pas dans Firebase en ligne');
   
   if (!process.env.FIREBASE_PROJECT_ID) {
     process.env.FIREBASE_PROJECT_ID = 'demo-project';
@@ -61,9 +54,10 @@ if (useEmulators) {
   console.log('   4. Cliquez sur "Générer une nouvelle clé privée"');
   console.log('   5. Téléchargez le JSON et extrayez les valeurs');
   console.log('');
-  console.log('💡 Alternative: Utilisez les emulators (déjà configuré automatiquement)');
-  console.log('');
-  process.exit(1);
+    console.log('💡 Note: Les emulators peuvent être utilisés en définissant FIRESTORE_EMULATOR_HOST dans .env');
+    console.log('   Mais par défaut, le backend utilise Firebase en production (en ligne)');
+    console.log('');
+    process.exit(1);
 } else {
   // Use production Firebase with credentials
   try {
@@ -74,8 +68,9 @@ if (useEmulators) {
         privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
       }),
     });
-    console.log('✅ Firebase Admin SDK initialisé avec succès');
+    console.log('✅ Firebase Admin SDK initialisé avec succès (PRODUCTION)');
     console.log(`   Project ID: ${process.env.FIREBASE_PROJECT_ID}`);
+    console.log('   📍 Les données seront enregistrées directement dans Firebase en ligne');
   } catch (error) {
     // If already initialized, that's okay
     if (error.code !== 'app/already-initialized') {
@@ -168,7 +163,12 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`   Local: http://localhost:${PORT}`);
   console.log(`   Network: http://0.0.0.0:${PORT}`);
   console.log(`   For Android Emulator: http://10.0.2.2:${PORT}`);
-  console.log(`   Firestore Emulator: ${process.env.FIRESTORE_EMULATOR_HOST || 'not set'}`);
+  if (useEmulators) {
+    console.log(`   ⚠️  Firestore Emulator: ${process.env.FIRESTORE_EMULATOR_HOST}`);
+    console.log(`   ⚠️  MODE EMULATOR - Les données ne seront PAS enregistrées dans Firebase en ligne`);
+  } else {
+    console.log(`   ✅ Firebase Production - Les données seront enregistrées directement dans Firebase en ligne`);
+  }
   console.log('');
   console.log('📡 Ready to receive requests...');
   console.log('   Test with: curl http://localhost:3000/health');

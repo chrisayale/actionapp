@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 /// Model for location information
 class PromotionLocation {
   final String? ville;
@@ -112,26 +114,30 @@ class PromotionModel {
       startDate: json['startDate'] != null
           ? (json['startDate'] is DateTime
               ? json['startDate'] as DateTime
-              : json['startDate'] is String
-                  ? DateTime.parse(json['startDate'] as String)
-                  : json['startDate'] is Map<String, dynamic>
-                      ? ((json['startDate'] as Map<String, dynamic>).containsKey('_seconds')
-                          ? DateTime.fromMillisecondsSinceEpoch(
-                              ((json['startDate'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
-                          : DateTime.parse(json['startDate'].toString()))
-                      : DateTime.now())
+              : json['startDate'] is Timestamp
+                  ? (json['startDate'] as Timestamp).toDate()
+                  : json['startDate'] is String
+                      ? DateTime.parse(json['startDate'] as String)
+                      : json['startDate'] is Map<String, dynamic>
+                          ? ((json['startDate'] as Map<String, dynamic>).containsKey('_seconds')
+                              ? DateTime.fromMillisecondsSinceEpoch(
+                                  ((json['startDate'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
+                              : DateTime.parse(json['startDate'].toString()))
+                          : DateTime.now())
           : DateTime.now(),
       endDate: json['endDate'] != null
           ? (json['endDate'] is DateTime
               ? json['endDate'] as DateTime
-              : json['endDate'] is String
-                  ? DateTime.parse(json['endDate'] as String)
-                  : json['endDate'] is Map<String, dynamic>
-                      ? ((json['endDate'] as Map<String, dynamic>).containsKey('_seconds')
-                          ? DateTime.fromMillisecondsSinceEpoch(
-                              ((json['endDate'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
-                          : DateTime.parse(json['endDate'].toString()))
-                      : DateTime.now())
+              : json['endDate'] is Timestamp
+                  ? (json['endDate'] as Timestamp).toDate()
+                  : json['endDate'] is String
+                      ? DateTime.parse(json['endDate'] as String)
+                      : json['endDate'] is Map<String, dynamic>
+                          ? ((json['endDate'] as Map<String, dynamic>).containsKey('_seconds')
+                              ? DateTime.fromMillisecondsSinceEpoch(
+                                  ((json['endDate'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
+                              : DateTime.parse(json['endDate'].toString()))
+                          : DateTime.now())
           : DateTime.now(),
       isActive: json['isActive'] as bool? ?? true,
       isUnlimited: json['isUnlimited'] as bool? ?? false,
@@ -141,26 +147,30 @@ class PromotionModel {
       createdAt: json['createdAt'] != null
           ? (json['createdAt'] is DateTime
               ? json['createdAt'] as DateTime
-              : json['createdAt'] is String
-                  ? DateTime.parse(json['createdAt'] as String)
-                  : json['createdAt'] is Map<String, dynamic>
-                      ? ((json['createdAt'] as Map<String, dynamic>).containsKey('_seconds')
-                          ? DateTime.fromMillisecondsSinceEpoch(
-                              ((json['createdAt'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
-                          : DateTime.parse(json['createdAt'].toString()))
-                      : DateTime.now())
+              : json['createdAt'] is Timestamp
+                  ? (json['createdAt'] as Timestamp).toDate()
+                  : json['createdAt'] is String
+                      ? DateTime.parse(json['createdAt'] as String)
+                      : json['createdAt'] is Map<String, dynamic>
+                          ? ((json['createdAt'] as Map<String, dynamic>).containsKey('_seconds')
+                              ? DateTime.fromMillisecondsSinceEpoch(
+                                  ((json['createdAt'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
+                              : DateTime.parse(json['createdAt'].toString()))
+                          : null)
           : null,
       updatedAt: json['updatedAt'] != null
           ? (json['updatedAt'] is DateTime
               ? json['updatedAt'] as DateTime
-              : json['updatedAt'] is String
-                  ? DateTime.parse(json['updatedAt'] as String)
-                  : json['updatedAt'] is Map<String, dynamic>
-                      ? ((json['updatedAt'] as Map<String, dynamic>).containsKey('_seconds')
-                          ? DateTime.fromMillisecondsSinceEpoch(
-                              ((json['updatedAt'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
-                          : DateTime.parse(json['updatedAt'].toString()))
-                      : DateTime.now())
+              : json['updatedAt'] is Timestamp
+                  ? (json['updatedAt'] as Timestamp).toDate()
+                  : json['updatedAt'] is String
+                      ? DateTime.parse(json['updatedAt'] as String)
+                      : json['updatedAt'] is Map<String, dynamic>
+                          ? ((json['updatedAt'] as Map<String, dynamic>).containsKey('_seconds')
+                              ? DateTime.fromMillisecondsSinceEpoch(
+                                  ((json['updatedAt'] as Map<String, dynamic>)['_seconds'] as int) * 1000)
+                              : DateTime.parse(json['updatedAt'].toString()))
+                          : null)
           : null,
     );
   }
