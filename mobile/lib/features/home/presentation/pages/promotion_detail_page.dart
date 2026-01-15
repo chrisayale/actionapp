@@ -57,15 +57,137 @@ class PromotionDetailPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Image de marque ou enseigne de l'établissement au centre
+                  // Image du produit/boisson en promotion au centre avec son nom
                   Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 200,
+                          height: 200,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: promotion.boissonImageUrl != null && promotion.boissonImageUrl!.isNotEmpty
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    promotion.boissonImageUrl!,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Icon(
+                                          Icons.local_drink,
+                                          size: 80,
+                                          color: Colors.white,
+                                        ),
+                                      );
+                                    },
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Center(
+                                          child: CircularProgressIndicator(
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                )
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.local_drink,
+                                    size: 80,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Nom du produit/boisson
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            promotion.boissonName,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  offset: const Offset(0, 2),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Gradient overlay léger en bas
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.3),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Contenu principal
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Section avec image de l'enseigne en fond jaune
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: AppSpacing.screenHorizontal),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppColors.yellowPrimary,
+                        AppColors.yellowPrimary.withOpacity(0.9),
+                      ],
+                    ),
+                  ),
+                  child: Center(
                     child: Container(
-                      width: 200,
-                      height: 200,
-                      padding: const EdgeInsets.all(20),
+                      width: 120,
+                      height: 120,
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: promotion.establishmentLogoUrl != null && promotion.establishmentLogoUrl!.isNotEmpty
                           ? ClipRRect(
@@ -81,7 +203,7 @@ class PromotionDetailPage extends StatelessWidget {
                                     ),
                                     child: const Icon(
                                       Icons.store_rounded,
-                                      size: 80,
+                                      size: 60,
                                       color: Colors.white,
                                     ),
                                   );
@@ -109,34 +231,13 @@ class PromotionDetailPage extends StatelessWidget {
                               ),
                               child: const Icon(
                                 Icons.store_rounded,
-                                size: 80,
+                                size: 60,
                                 color: Colors.white,
                               ),
                             ),
                     ),
                   ),
-                  // Gradient overlay léger en bas
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.3),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Contenu principal
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+                ),
                 // Card principale avec les informations
                 Container(
                   margin: const EdgeInsets.all(AppSpacing.screenHorizontal),

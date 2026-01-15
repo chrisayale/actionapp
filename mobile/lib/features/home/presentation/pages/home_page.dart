@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
@@ -36,6 +37,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     'Shopping',
     'Divertissement',
   ];
+  
+  StreamSubscription<QuerySnapshot>? _promotionsSubscription;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -131,6 +134,25 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
     _animationController.forward();
     _loadPublicPromotions();
+    
+    // Écouter les changements Firestore pour rafraîchir automatiquement
+    _setupFirestoreListener();
+  }
+  
+  void _setupFirestoreListener() {
+    // Écouter les changements dans la collection promotions
+    _promotionsSubscription = FirebaseService.firestore
+        .collection('promotions')
+        .where('isActive', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .listen((snapshot) {
+      // Rafraîchir la liste quand il y a des changements (nouvelle promotion créée, etc.)
+      if (mounted) {
+        _loadPublicPromotions();
+      }
+    });
   }
   
   Future<void> _loadPublicPromotions() async {
@@ -219,6 +241,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   @override
   void dispose() {
+    _promotionsSubscription?.cancel();
     _animationController.dispose();
     for (var controller in _pinDialogControllers) {
       controller.dispose();
@@ -505,6 +528,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         setState(() {
                           _selectedCategory = category;
                         });
+                        // Actualiser la liste quand on change de catégorie
+                        _loadPublicPromotions();
                       },
                       borderRadius: BorderRadius.circular(AppSpacing.radiusXLarge),
                       child: Container(
@@ -1768,7 +1793,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   children: [
                     // Header avec panneau jaune et icône ou image
                     Container(
-                      height: 100,
+                      height: 75,
                       decoration: BoxDecoration(
                         gradient: imageUrl == null || imageUrl.isEmpty
                             ? LinearGradient(
@@ -1805,7 +1830,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               child: Image.network(
                                 imageUrl,
                                 width: double.infinity,
-                                height: 100,
+                                height: 85,
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Center(
@@ -1903,7 +1928,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     ),
                     // Contenu
                     Padding(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      padding: const EdgeInsets.all(6),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -1912,7 +1937,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           Text(
                             name,
                             style: GoogleFonts.inter(
-                              fontSize: 14,
+                              fontSize: 12,
                               fontWeight: FontWeight.w800,
                               color: AppColors.textPrimaryLight,
                               letterSpacing: -0.2,
@@ -1920,7 +1945,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           // Localisation cliquable
                           GestureDetector(
                             onTap: onLocationTap,
@@ -1946,7 +1971,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ],
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 3),
                           // Promotion et prix
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1968,7 +1993,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     Text(
                                       price,
                                       style: GoogleFonts.inter(
-                                        fontSize: 12,
+                                        fontSize: 11,
                                         fontWeight: FontWeight.w800,
                                         color: AppColors.info,
                                       ),
@@ -1978,7 +2003,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           // Distance, rating et vues
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3210,7 +3235,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   ],
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3251,7 +3276,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           child: Text(
                             'Se connecter avec votre code PIN',
                             style: GoogleFonts.inter(
-                              fontSize: 22,
+                              fontSize: 20,
                               fontWeight: FontWeight.w800,
                               color: AppColors.textPrimaryLight,
                               letterSpacing: -0.5,
@@ -3260,7 +3285,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.xl),
+                    const SizedBox(height: 20),
                     // Champ Code PIN
                     Text(
                       'Code PIN',
@@ -3284,7 +3309,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xl),
+                    const SizedBox(height: 20),
                     // Boutons
                     Row(
                       children: [
@@ -3371,7 +3396,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: 12),
                     // Bouton discret "Changer le code PIN"
                     Center(
                       child: TextButton(
